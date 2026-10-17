@@ -1,0 +1,967 @@
+{
+  "info": {
+    "_postman_id": "trendline-tech-erp-collection-2026",
+    "name": "Trendline Tech - E-Commerce & Built-in ERP API Collection",
+    "description": "Comprehensive Postman collection for Trendline Tech E-Commerce platform integrated with built-in ERP, WMS, bilingual storefront, and NextAuth.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://192.168.1.2:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. System & Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Check if backend server, database, and process uptime are healthy."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication & RBAC",
+      "item": [
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set('adminToken', jsonData.token);",
+                  "    console.log('Saved adminToken automatically!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ahmed.sayed@trendlineeg.com\",\n  \"password\": \"trendlineeg@01009770207\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticates internal ERP/Admin users and returns JWT token."
+          }
+        },
+        {
+          "name": "NextAuth Verify Bridge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ahmed.sayed@trendlineeg.com\",\n  \"password\": \"trendlineeg@01009770207\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/nextauth-verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "nextauth-verify"]
+            },
+            "description": "Bridge endpoint called by NextAuth CredentialsProvider in frontend."
+          }
+        },
+        {
+          "name": "Forgot Password (Request OTP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ahmed.sayed@trendlineeg.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "forgot-password"]
+            },
+            "description": "Generates a 6-digit cryptographically hashed OTP and dispatches email via Zoho SMTP."
+          }
+        },
+        {
+          "name": "Reset Password with OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ahmed.sayed@trendlineeg.com\",\n  \"otp_code\": \"123456\",\n  \"new_password\": \"NewSuperSecurePass2026!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "reset-password"]
+            },
+            "description": "Verifies 6-digit OTP code (max 3 attempts, 10 min expiry) and resets password."
+          }
+        },
+        {
+          "name": "Get Current Profile (Me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Returns details of the currently authenticated administrator."
+          }
+        },
+        {
+          "name": "Update Preferred Language",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferred_lang\": \"ar\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "List Admins (Super Admin Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/admins",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "admins"]
+            }
+          }
+        },
+        {
+          "name": "Create Admin (Super Admin Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Kareem Warehouse Mgr\",\n  \"email\": \"kareem.warehouse@trendlineeg.com\",\n  \"password\": \"trendlineWarehouse2026\",\n  \"role\": \"warehouse\",\n  \"preferred_lang\": \"ar\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/admins",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "admins"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Catalog, Smart Categories, Tags & Bundles",
+      "item": [
+        {
+          "name": "Get Products (Search & Filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept-Language",
+                "value": "ar"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/products?search=&category_id=&brand_id=&min_price=&max_price=&in_stock_only=false&page=1&limit=20&sort=created_at_desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "products"],
+              "query": [
+                { "key": "search", "value": "" },
+                { "key": "category_id", "value": "" },
+                { "key": "brand_id", "value": "" },
+                { "key": "min_price", "value": "" },
+                { "key": "max_price", "value": "" },
+                { "key": "in_stock_only", "value": "false" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "sort", "value": "created_at_desc" }
+              ]
+            },
+            "description": "Storefront product catalog listing with bilingual full-text search, category/brand filters, and pagination."
+          }
+        },
+        {
+          "name": "Get Single Product by Slug/ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept-Language",
+                "value": "ar"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/products/tp-link-archer-ax53",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "products", "tp-link-archer-ax53"]
+            }
+          }
+        },
+        {
+          "name": "Create Product (with Auto-Categorization)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name_ar\": \"راوتر تي بي-لينك آرتشر AX53\",\n  \"name_en\": \"TP-Link Archer AX53 WiFi 6 Router\",\n  \"slug\": \"tp-link-archer-ax53-v2\",\n  \"sku\": \"TPL-AX53-V2\",\n  \"barcode\": \"6935364053215\",\n  \"short_desc_ar\": \"راوتر جيجابيت واي فاي 6 ثنائي النطاق بسرعة 3000 ميجابت\",\n  \"short_desc_en\": \"Dual-Band Gigabit Wi-Fi 6 Router with speeds up to 3000 Mbps\",\n  \"cost_price\": 1800.00,\n  \"original_price\": 2499.00,\n  \"sale_price\": 2199.00,\n  \"stock_quantity\": 50,\n  \"low_stock_threshold\": 5,\n  \"tag_ids\": [1, 5],\n  \"image_urls\": [\"https://images.trendlineeg.com/products/ax53.png\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/catalog/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "products"]
+            },
+            "description": "Admin endpoint creating product and automatically executing tag-to-category junction linkage."
+          }
+        },
+        {
+          "name": "Get Category Tree (Hierarchical)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept-Language",
+                "value": "ar"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/categories/tree?lang=ar",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "categories", "tree"],
+              "query": [
+                { "key": "lang", "value": "ar" }
+              ]
+            },
+            "description": "Returns full parent categories and nested subcategories with mapped tags and starting prices."
+          }
+        },
+        {
+          "name": "Create Category with Tag Mapping Rules",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name_ar\": \"أنظمة التخزين والـ NAS\",\n  \"name_en\": \"Network Attached Storage (NAS)\",\n  \"slug\": \"nas-storage\",\n  \"icon_url\": \"/icons/server.svg\",\n  \"starting_price\": 4500.00,\n  \"show_in_home_grid\": true,\n  \"sort_order\": 3,\n  \"tag_ids\": [1, 2]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/catalog/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "categories"]
+            }
+          }
+        },
+        {
+          "name": "Get Brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/brands",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "brands"]
+            }
+          }
+        },
+        {
+          "name": "Get Tags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "tags"]
+            }
+          }
+        },
+        {
+          "name": "Get Bundles (with Dynamic Real-Time Stock)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/bundles",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "bundles"]
+            },
+            "description": "Returns bundles where dynamic stock is calculated live from the available-to-sell stock of each component."
+          }
+        },
+        {
+          "name": "Create Bundle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name_ar\": \"باكدج الأمان المنزلي المتكامل\",\n  \"name_en\": \"Smart Home Security Package\",\n  \"slug\": \"smart-home-security-package\",\n  \"sku\": \"BDL-SEC-01\",\n  \"bundle_price\": 3999.00,\n  \"image_url\": \"https://images.trendlineeg.com/bundles/sec-01.png\",\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/catalog/bundles",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "bundles"]
+            }
+          }
+        },
+        {
+          "name": "Submit Guest Product Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 1,\n  \"guest_name\": \"محمود علي\",\n  \"guest_phone\": \"01019876543\",\n  \"rating\": 5,\n  \"comment\": \"راوتر ممتاز جداً وتغطية الواي فاي 6 قوية في الشقة بالكامل.\",\n  \"language\": \"ar\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/catalog/reviews",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "reviews"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Orders & Guest Checkout",
+      "item": [
+        {
+          "name": "Guest Checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"محمد حسن\",\n  \"customer_phone\": \"01005556677\",\n  \"customer_email\": \"mohamed.hassan@example.com\",\n  \"governorate\": \"القاهرة\",\n  \"city\": \"مدينة نصر\",\n  \"street_address\": \"شارع عباس العقاد - عمارة 15\",\n  \"coupon_code\": \"FIRST15\",\n  \"payment_method\": \"cod\",\n  \"cart_items\": [\n    {\n      \"item_type\": \"product\",\n      \"product_id\": 1,\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "checkout"]
+            },
+            "description": "Guest checkout: verifies FIRST15 coupon by phone, locks stock, logs RESERVE in ledger, and creates order TRD-YYMM-XXXX."
+          }
+        },
+        {
+          "name": "Track Order (by Phone or Order No)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept-Language",
+                "value": "ar"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/track?query=01005556677",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "track"],
+              "query": [
+                { "key": "query", "value": "01005556677" }
+              ]
+            },
+            "description": "Guest lookup by customer phone or public tracking code (e.g. TRD-2610-4498) returning full timeline."
+          }
+        },
+        {
+          "name": "Admin: List & Filter Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders?status=&payment_status=&search=&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders"],
+              "query": [
+                { "key": "status", "value": "" },
+                { "key": "payment_status", "value": "" },
+                { "key": "search", "value": "" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin: Update Order Status (State Machine)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\",\n  \"courier_name\": \"Bosta Express\",\n  \"tracking_waybill\": \"BST-9081234\",\n  \"internal_note\": \"Dispatched package to courier\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/1/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "1", "status"]
+            },
+            "description": "Transitions order state: 'confirmed', 'processing', 'shipped' (physical deduction), 'delivered' (revenue recognition), 'cancelled' (reservation released)."
+          }
+        },
+        {
+          "name": "Request RMA Return (14-Day Window)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"return_reason\": \"المنتج غير متوافق مع الراوتر الرئيسي القديم\",\n  \"refund_method\": \"instapay\",\n  \"items\": [\n    {\n      \"order_item_id\": 1,\n      \"product_id\": 1,\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/1/rma",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "1", "rma"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Built-in ERP (WMS, Procurement & Accounting)",
+      "item": [
+        {
+          "name": "WMS: Get Inventory Ledger (Audit Log)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/erp/inventory/ledger?product_id=1&transaction_type=&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "inventory", "ledger"],
+              "query": [
+                { "key": "product_id", "value": "1" },
+                { "key": "transaction_type", "value": "" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            },
+            "description": "Immutable stock ledger showing every single reservation, sale deduction, PO receive, and return."
+          }
+        },
+        {
+          "name": "WMS: Manual Stock Adjustment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 1,\n  \"quantity_change\": 10,\n  \"target_bucket\": \"on_hand\",\n  \"notes\": \"جرد سنوي وتصحيح رصيد المستودع الفعلي\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/erp/inventory/adjust",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "inventory", "adjust"]
+            }
+          }
+        },
+        {
+          "name": "Procurement: Get Suppliers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/erp/suppliers",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "suppliers"]
+            }
+          }
+        },
+        {
+          "name": "Procurement: Create Supplier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"الشركة الهندسية للتوزيع (وكيل TP-Link)\",\n  \"contact_person\": \"م. طارق محمود\",\n  \"phone\": \"01223334444\",\n  \"email\": \"sales@distributor-eg.com\",\n  \"tax_number\": \"TR-90812389\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/erp/suppliers",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "suppliers"]
+            }
+          }
+        },
+        {
+          "name": "Procurement: Create Purchase Order (PO)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplier_id\": 1,\n  \"notes\": \"أمر توريد 20 راوتر دفعة أكتوبر 2026\",\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity_ordered\": 20,\n      \"unit_cost\": 1750.00\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/erp/purchase-orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "purchase-orders"]
+            }
+          }
+        },
+        {
+          "name": "Procurement: Receive PO (Restock & WAC)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"received_items\": [\n    {\n      \"item_id\": 1,\n      \"quantity_received\": 20\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/erp/purchase-orders/1/receive",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "purchase-orders", "1", "receive"]
+            },
+            "description": "Receives PO items, updates physical on-hand stock in products, and automatically recalculates Weighted Average Cost (WAC)."
+          }
+        },
+        {
+          "name": "RMA: Warehouse QC Inspection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"return_item_id\": 1,\n      \"restock_action\": \"restock_available\",\n      \"item_condition\": \"sealed\"\n    }\n  ],\n  \"inspection_notes\": \"الكرتونة سليمة ومغلقة، تم فحص الباركود وإعادة توجيهها للمخزون المتاح\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/erp/rma/1/inspect",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "rma", "1", "inspect"]
+            }
+          }
+        },
+        {
+          "name": "Accounting: Get Cashflow Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/erp/financials",
+              "host": ["{{baseUrl}}"],
+              "path": ["erp", "financials"]
+            },
+            "description": "Returns financial transactions ledger and summary of total inflows, outflows, and net cashflow."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Storefront CMS, Marketing & Settings",
+      "item": [
+        {
+          "name": "Get Banners (Hero Vertical Slider & Promo)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept-Language",
+                "value": "ar"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cms/banners?placement=hero_vertical_slider",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "banners"],
+              "query": [
+                { "key": "placement", "value": "hero_vertical_slider" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Special Offer Cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cms/special-offers",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "special-offers"]
+            }
+          }
+        },
+        {
+          "name": "Get Store Features Strip",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cms/store-features",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "store-features"]
+            }
+          }
+        },
+        {
+          "name": "Get Shipping Zones (All 27 Governorates)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cms/shipping-zones",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "shipping-zones"]
+            }
+          }
+        },
+        {
+          "name": "Update Shipping Zone Fee",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipping_cost\": 50.00,\n  \"estimated_days_ar\": \"1-2 أيام عمل\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cms/shipping-zones/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "shipping-zones", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Coupons",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cms/coupons",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "coupons"]
+            }
+          }
+        },
+        {
+          "name": "Create Coupon",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"FLASH20\",\n  \"description_ar\": \"خصم 20% لفترة محدودة بحد أقصى 1000 جنيه\",\n  \"description_en\": \"20% Flash Discount capped at 1000 EGP\",\n  \"discount_type\": \"percentage\",\n  \"discount_value\": 20.00,\n  \"max_discount\": 1000.00,\n  \"min_order_value\": 1000.00,\n  \"first_order_only\": false,\n  \"usage_limit\": 200\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cms/coupons",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "coupons"]
+            }
+          }
+        },
+        {
+          "name": "Submit Contact Message (Guest)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"سامح عبد الله\",\n  \"email\": \"sameh@example.com\",\n  \"phone\": \"01112233445\",\n  \"message\": \"أحتاج استشارة فنية بخصوص شبكة كاميرات مراقبة لفيلا 3 أدوار.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cms/contact",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "contact"]
+            }
+          }
+        },
+        {
+          "name": "Subscribe to Newsletter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"subscriber@trendlineeg.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cms/newsletter",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "newsletter"]
+            }
+          }
+        },
+        {
+          "name": "Get Static Page by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cms/pages/about-us",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "pages", "about-us"]
+            }
+          }
+        },
+        {
+          "name": "Get Site Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cms/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "settings"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Site Setting",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"setting_key\": \"contact_hotline\",\n  \"setting_value_common\": \"19020\",\n  \"setting_group\": \"contact\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cms/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["cms", "settings"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🛒 Trendline Tech - Full-Stack E-Commerce & Built-in ERP System
 
-## Getting Started
+A high-performance bilingual E-Commerce storefront with a built-in Enterprise Resource Planning (ERP) engine, Warehouse Management System (WMS), and NextAuth integration.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🛠️ Tech Stack & Architecture
+
+- **Frontend & Admin:** Next.js (App Router), React 19, NextAuth.js
+- **Backend & ERP:** Node.js, Express.js (Port 5000)
+- **Database & ORM:** PostgreSQL 14 + Sequelize ORM (33 Models)
+- **Email Service:** Zoho SMTP (`smtp.zoho.com`) for 6-digit OTP codes & notifications
+- **Security:** Helmet, CORS Allowlist, Bcrypt password hashing, JWT Bearer tokens, Rate-limiting
+
+---
+
+## 🚀 Running the Project
+
+### 1. Environment Setup
+The project uses `.env` located in the project root:
+```env
+PORT=5000
+NODE_ENV=development
+BASE_URL=http://192.168.1.2:5000
+CLIENT_URL=http://192.168.1.2:3000
+ALLOWLIST=http://localhost:5000,http://192.168.1.2:5000,http://localhost:3000,http://192.168.1.2:3000
+DB_URL=postgres://postgres:1222440@localhost:5432/trendlineeg
+...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Available NPM Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Start Backend API & ERP Server (Port 5000)
+npm run server
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Start Backend in Watch/Dev mode
+npm run server:dev
 
-## Learn More
+# Run Database Seeders (Super Admin, Shipping Zones, Categories, Coupons)
+npm run seed
 
-To learn more about Next.js, take a look at the following resources:
+# Start Next.js Storefront (Port 3000)
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📁 Directory Structure
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+trendline/
+├── app/                        # Next.js App Router
+│   ├── api/auth/[...nextauth]/ # NextAuth integration bridge
+│   ├── layout.tsx
+│   └── page.tsx
+├── src/                        # Backend & ERP Engine
+│   ├── config/                 # Sequelize DB connection pool
+│   ├── controllers/            # Auth, Catalog, Order, ERP, and CMS controllers
+│   ├── middleware/             # Auth JWT, RBAC, i18n Localization, Error Handler
+│   ├── models/                 # 33 Sequelize Models (PK/FK and Full-Text Indexes)
+│   ├── routes/                 # API Routes (/api/v1/...)
+│   ├── seeders/                # Super Admin & Initial Data Seeders
+│   └── services/               # ERP Lifecycle, Auto-Categorization, Dynamic Bundles
+├── server.js                   # Express Backend Entry Point (Port 5000)
+├── .env                        # Environment Configuration
+├── package.json
+└── tsconfig.json
+```
