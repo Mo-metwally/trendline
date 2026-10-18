@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { getApiHost } from '@/src/utils/apiConfig';
 import './CategoryGrid.scss';
 
 export default function CategoryGrid({ lang = 'ar' }) {
@@ -16,10 +17,7 @@ export default function CategoryGrid({ lang = 'ar' }) {
     let isMounted = true;
     const fetchHomeCategories = async () => {
       try {
-        const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-          ? `http://${window.location.hostname}:5000`
-          : 'http://localhost:5000';
-
+        const apiHost = getApiHost();
         const res = await fetch(`${apiHost}/api/v1/catalog/home-categories`);
         if (res.ok) {
           const json = await res.json();

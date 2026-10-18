@@ -7,9 +7,6 @@ const {
   PurchaseOrderItem,
   Product,
   FinancialTransaction,
-  OrderReturn,
-  OrderReturnItem,
-  Order,
   AdminUser,
 } = require('../models');
 const OrderLifecycleService = require('../services/orderLifecycleService');
@@ -268,7 +265,7 @@ class ErpController {
   static async inspectRMA(req, res, next) {
     try {
       const { id } = req.params;
-      const { items, inspection_notes } = req.body; // items: [{ return_item_id, restock_action: 'restock_available'|'move_to_damaged', item_condition }]
+      const { items, inspection_notes: _inspection_notes } = req.body; // items: [{ return_item_id, restock_action: 'restock_available'|'move_to_damaged', item_condition }]
 
       const rma = await OrderLifecycleService.processReturnInspection(id, items, req.user);
       return res.status(200).json({

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { getApiHost } from '@/src/utils/apiConfig';
 import {
   AdminSidebar,
   AdminHeader,
@@ -214,25 +215,26 @@ export default function AdminSliderPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const [bannersRes, catsRes, prodsRes] = await Promise.all([
-        fetch(`${apiHost}/api/v1/cms/banners?all=true`),
-        fetch(`${apiHost}/api/v1/catalog/categories`),
-        fetch(`${apiHost}/api/v1/catalog/products?limit=50`),
+        fetch(`${apiHost}/api/v1/cms/banners?all=true`, { cache: 'no-store' }),
+        fetch(`${apiHost}/api/v1/catalog/categories`, { cache: 'no-store' }),
+        fetch(`${apiHost}/api/v1/catalog/products?limit=50`, { cache: 'no-store' }),
       ]);
 
-      const [bannersJson, catsJson, prodsJson] = await Promise.all([
-        bannersRes.json(),
-        catsRes.json(),
-        prodsRes.json(),
-      ]);
-
-      if (bannersJson.success) setBanners(bannersJson.data || []);
-      if (catsJson.success) setCategories(catsJson.data || []);
-      if (prodsJson.success) setProducts(prodsJson.data || []);
+      if (bannersRes.ok) {
+        const bannersJson = await bannersRes.json();
+        if (bannersJson.success) setBanners(bannersJson.data || []);
+      }
+      if (catsRes.ok) {
+        const catsJson = await catsRes.json();
+        if (catsJson.success) setCategories(catsJson.data || []);
+      }
+      if (prodsRes.ok) {
+        const prodsJson = await prodsRes.json();
+        if (prodsJson.success) setProducts(prodsJson.data || []);
+      }
     } catch (err) {
       console.error('Failed to load slider data:', err);
     } finally {
@@ -312,9 +314,7 @@ export default function AdminSliderPage() {
     try {
       setSavingOrder(true);
       const token = await ensureAuthToken();
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const items = banners.map((b, idx) => ({ id: b.id, sort_order: idx + 1 }));
 
@@ -349,9 +349,7 @@ export default function AdminSliderPage() {
   const handleToggleActive = async (banner) => {
     try {
       const token = await ensureAuthToken();
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const nextStatus = !banner.is_active;
       const res = await fetch(`${apiHost}/api/v1/cms/banners/${banner.id}`, {
@@ -574,9 +572,7 @@ export default function AdminSliderPage() {
 
     try {
       const token = await ensureAuthToken();
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       // Ensure image_url is not a dead temporary blob URL
       let finalImageUrl = formData.image_url || imagePreview || '';
@@ -680,9 +676,7 @@ export default function AdminSliderPage() {
     if (!confirm(isRtl ? 'هل أنت متأكد من حذف هذا الكارت من السلايدر؟' : 'Are you sure you want to delete this card?')) return;
     try {
       const token = await ensureAuthToken();
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const res = await fetch(`${apiHost}/api/v1/cms/banners/${id}`, {
         method: 'DELETE',

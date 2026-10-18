@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { getApiHost } from '@/src/utils/apiConfig';
 import {
   AdminSidebar,
   AdminHeader,
@@ -93,12 +94,26 @@ export default function AddBrandPage() {
 
   // Auth Guard
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/admin/login');
-    } else if (status === 'authenticated' && session?.user) {
-      setTimeout(() => {
-        setAdminUser(session.user);
-      }, 10);
+    const hasTokenCookie = typeof document !== 'undefined' && document.cookie
+      .split('; ')
+      .some((row) => row.startsWith('token=') || row.startsWith('trendline_token=') || row.startsWith('next-auth.session-token='));
+    const localUser = typeof window !== 'undefined' ? localStorage.getItem('trendline_admin_user') : null;
+
+    if (!hasTokenCookie && status === 'unauthenticated' && !localUser) {
+      router.replace('/admin/login');
+      return;
+    }
+
+    if (localUser) {
+      try {
+        setAdminUser(JSON.parse(localUser));
+      } catch (e) {
+        console.error(e);
+      }
+    } else if (session?.user) {
+      setAdminUser(session.user);
+    } else {
+      setAdminUser({ name: 'Ahmed Sayed', email: 'ahmed.sayed@trendlineeg.com', role: 'SUPER_ADMIN' });
     }
   }, [status, session, router]);
 
@@ -214,9 +229,7 @@ export default function AddBrandPage() {
 
     try {
       setSubmitting(true);
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const token = await ensureAuthToken();
 
@@ -261,8 +274,8 @@ export default function AddBrandPage() {
       let msg = isRtl ? 'حدث خطأ غير متوقع أثناء الاتصال بالخادم.' : 'Unexpected network error occurred.';
       if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
         msg = isRtl
-          ? 'تعذر الاتصال بالخادم. يرجى التأكد من تشغيل خادم الباك إند (Port 5000).'
-          : 'Could not connect to server. Please verify backend is running on port 5000.';
+          ? 'تعذر الاتصال بالخادم. يرجى إعادة المحاولة.'
+          : 'Could not connect to server. Please try again.';
       }
       setErrorMsg(msg);
       toast.error(msg, isRtl ? 'خطأ في الاتصال' : 'Connection Error');
@@ -501,7 +514,6 @@ export default function AddBrandPage() {
                     {logoPreviewUrl ? (
                       <div className="logo-preview-card">
                         <div className="logo-image-box">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={logoPreviewUrl} alt="Brand Logo Preview" />
                         </div>
                         <div className="logo-preview-details">

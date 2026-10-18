@@ -25,7 +25,7 @@ export default function AdminHeader({
       // Call backend logout endpoint if available
       try {
         await fetch('/api/auth/logout', { method: 'POST' });
-      } catch (e) {
+      } catch {
         // Ignore network error on logout
       }
     } finally {

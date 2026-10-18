@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { getApiHost } from '@/src/utils/apiConfig';
 import {
   AdminSidebar,
   AdminHeader,
@@ -149,12 +150,7 @@ function EditCategoryContent() {
     const fetchCategoryData = async () => {
       try {
         setPageLoading(true);
-        const apiHost =
-          typeof window !== 'undefined' &&
-          window.location.hostname !== 'localhost' &&
-          window.location.hostname !== '127.0.0.1'
-            ? `http://${window.location.hostname}:5000`
-            : 'http://localhost:5000';
+        const apiHost = getApiHost();
 
         const [catRes, allCatsRes, tagsRes] = await Promise.all([
           fetch(`${apiHost}/api/v1/catalog/categories/${categoryId}`),
@@ -309,12 +305,7 @@ function EditCategoryContent() {
 
     try {
       setTagCreating(true);
-      const apiHost =
-        typeof window !== 'undefined' &&
-        window.location.hostname !== 'localhost' &&
-        window.location.hostname !== '127.0.0.1'
-          ? `http://${window.location.hostname}:5000`
-          : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const token = await ensureAuthToken();
       const res = await fetch(`${apiHost}/api/v1/catalog/tags`, {
@@ -440,12 +431,7 @@ function EditCategoryContent() {
 
     try {
       setSaving(true);
-      const apiHost =
-        typeof window !== 'undefined' &&
-        window.location.hostname !== 'localhost' &&
-        window.location.hostname !== '127.0.0.1'
-          ? `http://${window.location.hostname}:5000`
-          : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const token = await ensureAuthToken();
 

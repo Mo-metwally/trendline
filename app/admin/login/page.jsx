@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
+import { getApiHost } from '@/src/utils/apiConfig';
 import './Login.scss';
 
 export default function AdminLoginPage() {
@@ -97,10 +98,7 @@ export default function AdminLoginPage() {
 
       // 2. Obtain backend JWT token and set authentication cookie
       try {
-        const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-          ? `http://${window.location.hostname}:5000`
-          : 'http://localhost:5000';
-
+        const apiHost = getApiHost();
         const backendRes = await fetch(`${apiHost}/api/v1/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

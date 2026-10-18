@@ -1,7 +1,7 @@
 /**
  * Centralized API Error Handling Middleware
  */
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res, _next) => {
   console.error(' Server Error:', err);
 
   const statusCode = err.statusCode || 500;

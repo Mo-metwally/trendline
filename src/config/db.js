@@ -8,16 +8,18 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const { Sequelize } = require('sequelize');
 
+const pg = require('pg');
 const dbUrl = process.env.DB_URL || 'postgres://postgres:1222440@localhost:5432/trendlineeg';
 
 const sequelize = new Sequelize(dbUrl, {
   dialect: 'postgres',
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  dialectModule: pg,
+  logging: false,
   pool: {
     max: 20,
-    min: 0,
+    min: 2,
     acquire: 30000,
-    idle: 10000,
+    idle: 60000,
   },
   dialectOptions: {
     clientMinMessages: 'ignore',

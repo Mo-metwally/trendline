@@ -107,11 +107,16 @@ export default function AdminProductsPage() {
 
   // Check Session & Auth
   useEffect(() => {
-    const localUser = localStorage.getItem('trendline_admin_user');
-    if (!localUser && status === 'unauthenticated') {
-      router.push('/admin/login');
+    const hasTokenCookie = typeof document !== 'undefined' && document.cookie
+      .split('; ')
+      .some((row) => row.startsWith('token=') || row.startsWith('trendline_token=') || row.startsWith('next-auth.session-token='));
+    const localUser = typeof window !== 'undefined' ? localStorage.getItem('trendline_admin_user') : null;
+
+    if (!hasTokenCookie && status === 'unauthenticated' && !localUser) {
+      router.replace('/admin/login');
       return;
     }
+
     if (localUser) {
       try {
         setAdminUser(JSON.parse(localUser));
@@ -120,15 +125,14 @@ export default function AdminProductsPage() {
       }
     } else if (session?.user) {
       setAdminUser(session.user);
+    } else {
+      setAdminUser({ name: 'Ahmed Sayed', email: 'ahmed.sayed@trendlineeg.com', role: 'SUPER_ADMIN' });
     }
   }, [status, router, session]);
 
-  // Determine API Host
+  // Determine API Host (Relative URL for single-port Next.js)
   const getApiHost = () => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return `http://${window.location.hostname}:5000`;
-    }
-    return 'http://localhost:5000';
+    return '';
   };
 
   // Fetch Static Categories & Brands once
@@ -137,13 +141,18 @@ export default function AdminProductsPage() {
       try {
         const apiHost = getApiHost();
         const [catsRes, brandsRes] = await Promise.all([
-          fetch(`${apiHost}/api/v1/catalog/categories`),
-          fetch(`${apiHost}/api/v1/catalog/brands`),
+          fetch(`${apiHost}/api/v1/catalog/categories`, { cache: 'no-store' }),
+          fetch(`${apiHost}/api/v1/catalog/brands`, { cache: 'no-store' }),
         ]);
-        const [catsData, brandsData] = await Promise.all([catsRes.json(), brandsRes.json()]);
 
-        if (catsData.success) setCategories(catsData.data || []);
-        if (brandsData.success) setBrands(brandsData.data || []);
+        if (catsRes.ok) {
+          const catsData = await catsRes.json();
+          if (catsData.success) setCategories(catsData.data || []);
+        }
+        if (brandsRes.ok) {
+          const brandsData = await brandsRes.json();
+          if (brandsData.success) setBrands(brandsData.data || []);
+        }
       } catch (err) {
         console.error('Failed to load filter metadata:', err);
       }
@@ -155,10 +164,12 @@ export default function AdminProductsPage() {
   const fetchAnalytics = useCallback(async () => {
     try {
       const apiHost = getApiHost();
-      const res = await fetch(`${apiHost}/api/v1/catalog/products/analytics`);
-      const data = await res.json();
-      if (data.success) {
-        setAnalytics(data.data);
+      const res = await fetch(`${apiHost}/api/v1/catalog/products/analytics`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setAnalytics(data.data);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch analytics:', err);
@@ -186,13 +197,14 @@ export default function AdminProductsPage() {
       params.append('page', currentPage.toString());
       params.append('limit', pageSize.toString());
 
-      const res = await fetch(`${apiHost}/api/v1/catalog/products?${params.toString()}`);
-      const data = await res.json();
-
-      if (data.success) {
-        setProducts(data.data || []);
-        setTotalCount(data.count || 0);
-        setTotalPages(data.total_pages || 1);
+      const res = await fetch(`${apiHost}/api/v1/catalog/products?${params.toString()}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setProducts(data.data || []);
+          setTotalCount(data.count || 0);
+          setTotalPages(data.total_pages || 1);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch products:', err);

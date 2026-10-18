@@ -7,7 +7,6 @@ import {
   FaMagnifyingGlass,
   FaFolderTree,
   FaFolder,
-  FaTag,
 } from 'react-icons/fa6';
 import './CustomSelect.scss';
 

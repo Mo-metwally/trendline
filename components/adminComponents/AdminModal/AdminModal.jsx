@@ -14,7 +14,9 @@ export default function AdminModal({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose && onClose();
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);

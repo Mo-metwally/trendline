@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { getApiHost } from '@/src/utils/apiConfig';
 import './HeroSlider.scss';
 
 // Helper to map broken mock URLs to local assets
@@ -104,13 +105,7 @@ export default function HeroSlider({ lang = 'ar' }) {
     let isMounted = true;
     const fetchBanners = async () => {
       try {
-        const apiHost =
-          typeof window !== 'undefined' &&
-          window.location.hostname !== 'localhost' &&
-          window.location.hostname !== '127.0.0.1'
-            ? `http://${window.location.hostname}:5000`
-            : 'http://localhost:5000';
-
+        const apiHost = getApiHost();
         const res = await fetch(`${apiHost}/api/v1/cms/banners`);
         if (res.ok) {
           const json = await res.json();

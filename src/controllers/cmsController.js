@@ -215,7 +215,7 @@ class CmsController {
       const { email, locale } = req.body;
       if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
 
-      const [subscriber, created] = await NewsletterSubscriber.findOrCreate({
+      const [, created] = await NewsletterSubscriber.findOrCreate({
         where: { email: email.toLowerCase().trim() },
         defaults: { locale: locale || req.locale || 'ar', is_active: true },
       });

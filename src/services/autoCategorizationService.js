@@ -1,4 +1,4 @@
-const { sequelize, CategoryTag, ProductCategory, ProductTag } = require('../models');
+const { CategoryTag, ProductCategory, ProductTag } = require('../models');
 
 /**
  * Hybrid Tag-to-Category Auto-Linking Service

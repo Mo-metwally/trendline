@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import { getApiHost } from '@/src/utils/apiConfig';
 import './Navbar.scss';
 
 export default function Navbar({ lang = 'ar' }) {
@@ -37,10 +38,7 @@ export default function Navbar({ lang = 'ar' }) {
     let isMounted = true;
     const fetchCategories = async () => {
       try {
-        const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-          ? `http://${window.location.hostname}:5000`
-          : 'http://localhost:5000';
-
+        const apiHost = getApiHost();
         const res = await fetch(`${apiHost}/api/v1/catalog/categories/tree`);
         if (res.ok) {
           const json = await res.json();

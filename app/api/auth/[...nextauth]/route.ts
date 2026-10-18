@@ -15,10 +15,13 @@ export const authOptions: NextAuthOptions = {
         }
 
         const candidateUrls = [
+          'http://127.0.0.1:3000',
+          'http://localhost:3000',
           process.env.INTERNAL_API_URL,
+          process.env.NEXTAUTH_URL,
+          process.env.BASE_URL,
           'http://127.0.0.1:5000',
           'http://localhost:5000',
-          process.env.BASE_URL,
         ].filter(Boolean) as string[];
 
         // Remove duplicates

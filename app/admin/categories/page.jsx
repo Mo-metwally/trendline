@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { getApiHost } from '@/src/utils/apiConfig';
 import {
   AdminSidebar,
   AdminHeader,
@@ -182,20 +183,21 @@ export default function AdminCategoriesPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const [catRes, tagRes] = await Promise.all([
-        fetch(`${apiHost}/api/v1/catalog/categories`),
-        fetch(`${apiHost}/api/v1/catalog/tags`),
+        fetch(`${apiHost}/api/v1/catalog/categories`, { cache: 'no-store' }),
+        fetch(`${apiHost}/api/v1/catalog/tags`, { cache: 'no-store' }),
       ]);
 
-      const catJson = await catRes.json();
-      const tagJson = await tagRes.json();
-
-      if (catJson.success) setCategories(catJson.data || []);
-      if (tagJson.success) setTags(tagJson.data || []);
+      if (catRes.ok) {
+        const catJson = await catRes.json();
+        if (catJson.success) setCategories(catJson.data || []);
+      }
+      if (tagRes.ok) {
+        const tagJson = await tagRes.json();
+        if (tagJson.success) setTags(tagJson.data || []);
+      }
     } catch (err) {
       console.error('Failed to load categories/tags:', err);
     } finally {
@@ -315,9 +317,7 @@ export default function AdminCategoriesPage() {
 
     try {
       setActionLoading(true);
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const token = await ensureAuthToken();
       const url = editingCategory
@@ -360,9 +360,7 @@ export default function AdminCategoriesPage() {
   // Toggle Active Status
   const handleToggleStatus = async (cat) => {
     try {
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const token = await ensureAuthToken();
       const res = await fetch(`${apiHost}/api/v1/catalog/categories/${cat.id}/toggle`, {
@@ -388,9 +386,7 @@ export default function AdminCategoriesPage() {
     if (!categoryToDelete) return;
     try {
       setActionLoading(true);
-      const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `http://${window.location.hostname}:5000`
-        : 'http://localhost:5000';
+      const apiHost = getApiHost();
 
       const token = await ensureAuthToken();
       const res = await fetch(`${apiHost}/api/v1/catalog/categories/${categoryToDelete.id}`, {
