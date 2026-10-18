@@ -27,6 +27,15 @@ export function OptionIconRenderer({
         src={imageUrl}
         alt=""
         className="category-item-thumb"
+        style={{
+          width: '100%',
+          height: '100%',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          objectFit: 'cover',
+          borderRadius: '4px',
+          display: 'block',
+        }}
         onError={(e) => {
           e.currentTarget.style.display = 'none';
         }}
@@ -52,6 +61,15 @@ export function OptionIconRenderer({
           src={iconUrl}
           alt=""
           className="category-item-thumb"
+          style={{
+            width: '100%',
+            height: '100%',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: 'cover',
+            borderRadius: '4px',
+            display: 'block',
+          }}
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}

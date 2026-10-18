@@ -36,8 +36,10 @@
     .brand-sub,
     .nav-label,
     .nav-badge,
-    .nav-section-title {
-      display: none;
+    .nav-section-title,
+    .nav-chevron,
+    .nav-sub-menu {
+      display: none !important;
     }
 
     .brand-header {
@@ -125,6 +127,13 @@
     flex-direction: column;
     gap: 4px;
 
+    .nav-section-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 8px;
+    }
+
     .nav-section-title {
       font-size: 11px;
       font-weight: 800;
@@ -132,6 +141,11 @@
       text-transform: uppercase;
       letter-spacing: 0.8px;
       padding: 14px 12px 6px;
+    }
+
+    .nav-group-container {
+      display: flex;
+      flex-direction: column;
     }
 
     .nav-item {
@@ -147,6 +161,11 @@
       cursor: pointer;
       transition: all 0.2s ease;
       position: relative;
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: inherit;
+      font-family: inherit;
 
       .nav-icon {
         width: 22px;
@@ -172,6 +191,20 @@
         color: var(--main-color);
       }
 
+      .nav-chevron {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #a0aec0;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+        margin-inline-start: auto;
+
+        &.rotated {
+          transform: rotate(180deg);
+          color: var(--main-color);
+        }
+      }
+
       &:hover {
         background: rgba(0, 87, 194, 0.06);
         color: var(--main-color);
@@ -179,9 +212,23 @@
         .nav-icon {
           transform: scale(1.1);
         }
+
+        .nav-chevron {
+          color: var(--main-color);
+        }
       }
 
-      &.active {
+      &.parent-active {
+        background: rgba(0, 87, 194, 0.07);
+        color: var(--main-color);
+        font-weight: 800;
+
+        .nav-chevron {
+          color: var(--main-color);
+        }
+      }
+
+      &.active:not(.nav-parent-btn) {
         background: var(--main-color);
         color: var(--sec-text-color);
         box-shadow: 0 6px 18px var(--main-color-op);
@@ -189,6 +236,79 @@
         .nav-badge {
           background: rgba(255, 255, 255, 0.25);
           color: #ffffff;
+        }
+      }
+    }
+
+    /* Submenu Accordion */
+    .nav-sub-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 4px;
+      margin-bottom: 6px;
+      padding-inline-start: 22px;
+      position: relative;
+      animation: fadeInSub 0.22s ease-out;
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 6px;
+        bottom: 6px;
+        inset-inline-start: 18px;
+        width: 2px;
+        background: rgba(0, 87, 194, 0.15);
+        border-radius: 2px;
+      }
+
+      .nav-sub-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        border-radius: 10px;
+        color: var(--main-text-color-op);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        position: relative;
+
+        .nav-sub-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 18px;
+          height: 18px;
+          color: #8898aa;
+          transition: color 0.2s, transform 0.2s;
+        }
+
+        .nav-sub-label {
+          flex: 1;
+          white-space: nowrap;
+        }
+
+        &:hover {
+          background: rgba(0, 87, 194, 0.06);
+          color: var(--main-color);
+
+          .nav-sub-icon {
+            color: var(--main-color);
+            transform: scale(1.15);
+          }
+        }
+
+        &.active {
+          background: var(--main-color);
+          color: var(--sec-text-color);
+          font-weight: 700;
+          box-shadow: 0 4px 12px var(--main-color-op);
+
+          .nav-sub-icon {
+            color: var(--sec-text-color);
+          }
         }
       }
     }
@@ -219,6 +339,17 @@
         animation: pulseStatus 2s infinite;
       }
     }
+  }
+}
+
+@keyframes fadeInSub {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

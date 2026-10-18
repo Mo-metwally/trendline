@@ -1,0 +1,839 @@
+/* ==========================================================================
+   Admin Brands Management Styles - Trendline Modern Design System
+   ========================================================================== */
+
+.admin-brands-page {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--page-bg, #f8fafc);
+  color: var(--main-text-color, #0f172a);
+  font-family: var(--font-cairo), 'Cairo', sans-serif;
+  direction: rtl;
+
+  &[dir="ltr"] {
+    direction: ltr;
+  }
+
+  .admin-main-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .brands-main-container {
+    flex: 1;
+    padding: 28px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+
+    @media (max-width: 768px) {
+      padding: 16px;
+    }
+  }
+
+  /* Breadcrumbs */
+  .brands-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 14px;
+
+    a {
+      color: #64748b;
+      text-decoration: none;
+      transition: color 0.2s;
+
+      &:hover {
+        color: var(--main-color, #0057C2);
+      }
+    }
+
+    .crumb-sep {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .current-crumb {
+      color: var(--main-color, #0057C2);
+      font-weight: 700;
+    }
+  }
+
+  /* Page Header Bar */
+  .brands-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+
+    .header-title-box {
+      h1 {
+        font-size: 26px;
+        font-weight: 900;
+        color: #0f172a;
+        margin: 0 0 6px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .brand-icon-pill {
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(0, 87, 194, 0.1) 0%, rgba(0, 87, 194, 0.18) 100%);
+          color: var(--main-color, #0057C2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+        }
+      }
+
+      p {
+        font-size: 13.5px;
+        color: #64748b;
+        margin: 0;
+      }
+    }
+
+    .header-actions-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .btn-refresh-brands {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1.5px solid #e2e8f0;
+        background: #ffffff;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #f1f5f9;
+          color: var(--main-color, #0057C2);
+          border-color: #cbd5e1;
+        }
+      }
+
+      .btn-add-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        background: var(--main-color, #0057C2);
+        color: #ffffff;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 800;
+        text-decoration: none;
+        box-shadow: 0 4px 14px rgba(0, 87, 194, 0.25);
+        transition: all 0.25s ease;
+
+        &:hover {
+          background: #00469c;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 18px rgba(0, 87, 194, 0.35);
+        }
+      }
+    }
+  }
+
+  /* Stats Grid */
+  .brands-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 26px;
+
+    @media (max-width: 1200px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Controls & Search Card */
+  .brands-controls-card {
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1.5px solid #e2e8f0;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+
+    .search-filter-cluster {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      min-width: 300px;
+      flex-wrap: wrap;
+
+      .search-input-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 240px;
+
+        .search-icon {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          right: 14px;
+          color: #94a3b8;
+          font-size: 15px;
+          pointer-events: none;
+        }
+
+        input {
+          width: 100%;
+          padding: 10px 42px 10px 16px;
+          border-radius: 12px;
+          border: 1.5px solid #e2e8f0;
+          font-size: 13.5px;
+          color: #0f172a;
+          background: #f8fafc;
+          transition: all 0.2s;
+          outline: none;
+
+          &:focus {
+            background: #ffffff;
+            border-color: var(--main-color, #0057C2);
+            box-shadow: 0 0 0 3px rgba(0, 87, 194, 0.12);
+          }
+
+          &::placeholder {
+            color: #94a3b8;
+          }
+        }
+      }
+
+      .filter-tabs-pills {
+        display: flex;
+        background: #f1f5f9;
+        border-radius: 12px;
+        padding: 4px;
+        gap: 3px;
+
+        .filter-pill {
+          padding: 6px 14px;
+          border-radius: 9px;
+          border: none;
+          background: transparent;
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.2s;
+
+          &.active {
+            background: #ffffff;
+            color: var(--main-color, #0057C2);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+          }
+        }
+      }
+    }
+
+    .controls-meta-info {
+      font-size: 13px;
+      font-weight: 700;
+      color: #64748b;
+
+      .highlight-count {
+        color: var(--main-color, #0057C2);
+        font-weight: 900;
+      }
+    }
+  }
+
+  /* Brands Table Card */
+  .brands-table-card {
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1.5px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+
+    .table-responsive-wrapper {
+      overflow-x: auto;
+      width: 100%;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .brands-table {
+      width: 100%;
+      min-width: 780px;
+      border-collapse: collapse;
+      text-align: right;
+
+      th {
+        background: #f8fafc;
+        padding: 16px 20px;
+        font-size: 12.5px;
+        font-weight: 800;
+        color: #475569;
+        border-bottom: 1.5px solid #e2e8f0;
+        white-space: nowrap;
+      }
+
+      td {
+        padding: 16px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+        font-size: 13.5px;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      tbody tr {
+        transition: background-color 0.15s ease;
+
+        &:hover {
+          background-color: #f8fafc;
+        }
+      }
+    }
+
+    /* Logo cell */
+    .brand-logo-cell {
+      width: 72px;
+
+      .logo-box {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        border: 1.5px solid #e2e8f0;
+        background: #ffffff;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+
+        .fallback-logo-icon {
+          color: #94a3b8;
+          font-size: 22px;
+        }
+      }
+    }
+
+    /* Brand Name & Details */
+    .brand-names-box {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+
+      .brand-ar-name {
+        font-size: 14.5px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+
+      .brand-en-name {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #64748b;
+      }
+    }
+
+    /* Slug Pill */
+    .slug-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      font-family: monospace;
+      font-size: 12px;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Products Count Badge */
+    .products-count-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: var(--main-color, #0057C2);
+      border: 1px solid #bfdbfe;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    /* Status & Featured Toggle Buttons */
+    .status-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: none;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &.is-active {
+        background: #dcfce7;
+        color: #15803d;
+
+        &:hover {
+          background: #bbf7d0;
+        }
+      }
+
+      &.is-inactive {
+        background: #fee2e2;
+        color: #b91c1c;
+
+        &:hover {
+          background: #fecaca;
+        }
+      }
+    }
+
+    .featured-toggle-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1.5px solid #e2e8f0;
+      background: #ffffff;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 15px;
+      transition: all 0.2s;
+
+      &.is-featured {
+        background: #fef9c3;
+        color: #ca8a04;
+        border-color: #fde047;
+      }
+
+      &:hover {
+        transform: scale(1.1);
+      }
+    }
+
+    /* Actions Buttons */
+    .actions-buttons-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .btn-action {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1.5px solid #e2e8f0;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+
+        &.btn-edit {
+          color: #0284c7;
+
+          &:hover {
+            background: #e0f2fe;
+            border-color: #7dd3fc;
+          }
+        }
+
+        &.btn-delete {
+          color: #e11d48;
+
+          &:hover {
+            background: #ffe4e6;
+            border-color: #fca5a5;
+          }
+        }
+      }
+    }
+
+    /* Empty state */
+    .empty-brands-container {
+      padding: 60px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+
+      .empty-icon-wrap {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        margin-bottom: 6px;
+      }
+
+      h3 {
+        font-size: 17px;
+        font-weight: 800;
+        color: #1e293b;
+        margin: 0;
+      }
+
+      p {
+        font-size: 13.5px;
+        color: #64748b;
+        margin: 0;
+        max-width: 420px;
+      }
+    }
+  }
+
+  /* ----------------------------------------------------
+     Edit Brand Modal Styles
+     ---------------------------------------------------- */
+  .edit-brand-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+
+    .form-group-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+
+      @media (max-width: 640px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #334155;
+
+        .required-star {
+          color: #ef4444;
+          margin-right: 3px;
+        }
+      }
+
+      input[type="text"],
+      input[type="number"],
+      input[type="url"],
+      textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1.5px solid #cbd5e1;
+        font-size: 13.5px;
+        color: #0f172a;
+        background: #ffffff;
+        outline: none;
+        transition: all 0.2s;
+
+        &:focus {
+          border-color: var(--main-color, #0057C2);
+          box-shadow: 0 0 0 3px rgba(0, 87, 194, 0.12);
+        }
+
+        &::placeholder {
+          color: #94a3b8;
+        }
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 75px;
+      }
+    }
+
+    /* Logo Upload Dropzone inside Modal */
+    .modal-logo-uploader {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 14px 16px;
+      background: #f8fafc;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 14px;
+
+      .current-logo-preview {
+        width: 64px;
+        height: 64px;
+        border-radius: 12px;
+        border: 1.5px solid #e2e8f0;
+        background: #ffffff;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex-shrink: 0;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+      }
+
+      .logo-upload-info {
+        flex: 1;
+
+        .btn-change-logo {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          border-radius: 9px;
+          border: 1.5px solid #cbd5e1;
+          background: #ffffff;
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #334155;
+          cursor: pointer;
+          transition: all 0.2s;
+
+          &:hover {
+            border-color: var(--main-color, #0057C2);
+            color: var(--main-color, #0057C2);
+          }
+        }
+
+        .upload-hint {
+          display: block;
+          font-size: 11px;
+          color: #64748b;
+          margin-top: 5px;
+        }
+      }
+    }
+
+    /* Switches Row */
+    .switches-dual-row {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+
+      .switch-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+
+        input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          accent-color: var(--main-color, #0057C2);
+          cursor: pointer;
+        }
+
+        span {
+          font-size: 13px;
+          font-weight: 700;
+          color: #334155;
+        }
+      }
+    }
+
+    .modal-footer-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 10px;
+      padding-top: 16px;
+      border-top: 1px solid #f1f5f9;
+
+      .btn-cancel {
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 1.5px solid #cbd5e1;
+        background: #ffffff;
+        color: #475569;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #f1f5f9;
+        }
+      }
+
+      .btn-save-changes {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 24px;
+        border-radius: 10px;
+        border: none;
+        background: var(--main-color, #0057C2);
+        color: #ffffff;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover:not(:disabled) {
+          background: #00469c;
+          transform: translateY(-1px);
+        }
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+
+  /* Delete Confirmation Box */
+  .delete-brand-modal-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+    padding: 10px 0;
+
+    .delete-warning-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: #fee2e2;
+      color: #ef4444;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+
+    h4 {
+      font-size: 18px;
+      font-weight: 900;
+      color: #0f172a;
+      margin: 0;
+    }
+
+    p {
+      font-size: 13.5px;
+      color: #64748b;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .brand-delete-card-preview {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 18px;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      margin: 8px 0;
+
+      img {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+      }
+
+      .delete-preview-name {
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+    }
+
+    .delete-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      justify-content: center;
+      margin-top: 10px;
+
+      .btn-cancel-delete {
+        flex: 1;
+        padding: 11px;
+        border-radius: 10px;
+        border: 1.5px solid #cbd5e1;
+        background: #ffffff;
+        color: #475569;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn-confirm-delete {
+        flex: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 11px;
+        border-radius: 10px;
+        border: none;
+        background: #ef4444;
+        color: #ffffff;
+        font-weight: 800;
+        cursor: pointer;
+        transition: background 0.2s;
+
+        &:hover {
+          background: #dc2626;
+        }
+      }
+    }
+  }
+}

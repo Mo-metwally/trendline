@@ -95,6 +95,20 @@ router.post(
   CatalogController.createBrand
 );
 
+router.put(
+  '/brands/:id',
+  authMiddleware,
+  permitRoles('super_admin', 'erp_manager'),
+  CatalogController.updateBrand
+);
+
+router.delete(
+  '/brands/:id',
+  authMiddleware,
+  permitRoles('super_admin', 'erp_manager'),
+  CatalogController.deleteBrand
+);
+
 router.post(
   '/tags',
   authMiddleware,

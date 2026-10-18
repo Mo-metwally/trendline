@@ -212,6 +212,7 @@ class CatalogController {
         cost_price,
         original_price,
         sale_price,
+        sale_ends_at,
         stock_quantity,
         low_stock_threshold = 5,
         is_featured,
@@ -220,6 +221,7 @@ class CatalogController {
         primary_category_id,
         tag_ids = [],
         image_urls = [],
+        video_urls = [],
       } = req.body;
 
       // Validate category requirement: at least one category is mandatory
@@ -257,9 +259,11 @@ class CatalogController {
         description_ar: description_ar || null,
         description_en: description_en || null,
         specifications: specifications || null,
+        video_urls: Array.isArray(video_urls) ? video_urls : [],
         cost_price: cost_price || 0.00,
         original_price,
         sale_price: sale_price || null,
+        sale_ends_at: sale_ends_at ? new Date(sale_ends_at) : null,
         discount_percent,
         stock_quantity: stock_quantity || 0,
         low_stock_threshold: low_stock_threshold || 5,
@@ -925,11 +929,31 @@ class CatalogController {
 
   static async getBrands(req, res, next) {
     try {
+      const { all } = req.query;
+      const where = {};
+      if (all !== 'true') {
+        where.is_active = true;
+      }
       const brands = await Brand.findAll({
-        where: { is_active: true },
-        order: [['sort_order', 'ASC'], ['name_en', 'ASC']],
+        where,
+        include: [
+          {
+            model: Product,
+            as: 'products',
+            attributes: ['id'],
+          },
+        ],
+        order: [['sort_order', 'ASC'], ['name_en', 'ASC'], ['id', 'DESC']],
       });
-      return res.status(200).json({ success: true, data: res.localize(brands) });
+
+      const formatted = brands.map((b) => {
+        const json = b.toJSON();
+        json.products_count = json.products ? json.products.length : 0;
+        delete json.products;
+        return json;
+      });
+
+      return res.status(200).json({ success: true, count: formatted.length, data: formatted });
     } catch (error) {
       next(error);
     }
@@ -937,8 +961,72 @@ class CatalogController {
 
   static async createBrand(req, res, next) {
     try {
-      const brand = await Brand.create(req.body);
+      const { name_ar, name_en, slug, logo_url, description_ar, description_en, website_url, is_featured, is_active, sort_order } = req.body;
+      if (!name_ar || !name_en) {
+        return res.status(400).json({ success: false, message: 'Both Arabic and English brand names are required' });
+      }
+      const finalLogo = logo_url || '/icons/category-default.svg';
+      const brandSlug = slug || name_en.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const brand = await Brand.create({
+        name_ar: name_ar.trim(),
+        name_en: name_en.trim(),
+        slug: brandSlug,
+        logo_url: finalLogo,
+        description_ar: description_ar || null,
+        description_en: description_en || null,
+        website_url: website_url || null,
+        is_featured: !!is_featured,
+        is_active: is_active !== undefined ? !!is_active : true,
+        sort_order: Number(sort_order) || 0,
+      });
       return res.status(201).json({ success: true, data: brand });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateBrand(req, res, next) {
+    try {
+      const { id } = req.params;
+      const brand = await Brand.findByPk(id);
+      if (!brand) {
+        return res.status(404).json({ success: false, message: 'Brand not found' });
+      }
+      const { name_ar, name_en, slug, logo_url, description_ar, description_en, website_url, is_featured, is_active, sort_order } = req.body;
+      const updateData = {};
+      if (name_ar !== undefined) updateData.name_ar = name_ar.trim();
+      if (name_en !== undefined) updateData.name_en = name_en.trim();
+      if (slug !== undefined) updateData.slug = slug.trim();
+      if (logo_url !== undefined) updateData.logo_url = logo_url;
+      if (description_ar !== undefined) updateData.description_ar = description_ar;
+      if (description_en !== undefined) updateData.description_en = description_en;
+      if (website_url !== undefined) updateData.website_url = website_url;
+      if (is_featured !== undefined) updateData.is_featured = !!is_featured;
+      if (is_active !== undefined) updateData.is_active = !!is_active;
+      if (sort_order !== undefined) updateData.sort_order = Number(sort_order);
+
+      await brand.update(updateData);
+      return res.status(200).json({ success: true, message: 'Brand updated successfully', data: brand });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteBrand(req, res, next) {
+    try {
+      const { id } = req.params;
+      const brand = await Brand.findByPk(id);
+      if (!brand) {
+        return res.status(404).json({ success: false, message: 'Brand not found' });
+      }
+      // Check if products are tied to this brand
+      const productsCount = await Product.count({ where: { brand_id: id } });
+      if (productsCount > 0) {
+        // Disassociate products from this brand
+        await Product.update({ brand_id: null }, { where: { brand_id: id } });
+      }
+      await brand.destroy();
+      return res.status(200).json({ success: true, message: 'Brand deleted successfully' });
     } catch (error) {
       next(error);
     }

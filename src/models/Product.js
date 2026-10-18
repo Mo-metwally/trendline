@@ -59,6 +59,11 @@ const Product = sequelize.define('Product', {
     type: DataTypes.JSONB,
     allowNull: true,
   },
+  video_urls: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: [],
+  },
   cost_price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
@@ -72,6 +77,11 @@ const Product = sequelize.define('Product', {
   sale_price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: true,
+  },
+  sale_ends_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'Expiration date/timestamp for promotional sale discount',
   },
   discount_percent: {
     type: DataTypes.SMALLINT,

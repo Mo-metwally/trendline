@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -9,6 +9,7 @@ import {
   AdminHeader,
   CustomSelect,
   OptionIconRenderer,
+  useToast,
 } from '@/src/components/adminComponents';
 import {
   FaFolderTree,
@@ -24,12 +25,55 @@ import {
   FaCheck,
   FaTriangleExclamation,
   FaXmark,
+  FaCloudArrowUp,
+  FaImage,
+  FaVideo,
+  FaFilm,
+  FaTrashCan,
+  FaArrowsRotate,
+  FaCircleCheck,
+  FaPlay,
+  FaPause,
+  FaClock,
+  FaCompress,
+  FaWandMagicSparkles,
+  FaPlus,
+  FaEye,
+  FaCopyright,
 } from 'react-icons/fa6';
+import dynamic from 'next/dynamic';
+import { formatFactory, formatDuration, formatBytes } from '@/src/utils/formatFactory';
 import './AddProduct.scss';
+
+const QuillEditor = dynamic(
+  () => import('@/src/components/adminComponents/QuillEditor/QuillEditor'),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        style={{
+          minHeight: '180px',
+          background: '#f8fafc',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#94a3b8',
+          fontSize: '13px',
+          fontWeight: 600,
+        }}
+      >
+        جارٍ تهيئة محرر النصوص المتطور...
+      </div>
+    ),
+  }
+);
 
 export default function AddProductPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const toast = useToast();
 
   // Layout & Language State
   const [adminUser, setAdminUser] = useState(null);
@@ -43,6 +87,18 @@ export default function AddProductPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Media Processing & Feedback State
+  const [mediaError, setMediaError] = useState('');
+  const [mediaNotice, setMediaNotice] = useState('');
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(false);
+
+  // Hidden File Input Refs
+  const coverInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   // Prerequisites from DB
   const [categoriesTree, setCategoriesTree] = useState([]);
@@ -61,6 +117,7 @@ export default function AddProductPage() {
   const [descriptionEn, setDescriptionEn] = useState('');
 
   // Form Fields - Category Hierarchy (Multi-selection & Primary)
+  const [selectedRootCategoryId, setSelectedRootCategoryId] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [primaryCategoryId, setPrimaryCategoryId] = useState('');
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
@@ -70,6 +127,17 @@ export default function AddProductPage() {
   const [costPrice, setCostPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
+  const [saleEndsAt, setSaleEndsAt] = useState('');
+  const [currentMinDate, setCurrentMinDate] = useState('');
+  const [nowTimestamp, setNowTimestamp] = useState(null);
+
+  useEffect(() => {
+    const now = new Date();
+    setTimeout(() => {
+      setCurrentMinDate(now.toISOString().slice(0, 16));
+      setNowTimestamp(now.getTime());
+    }, 10);
+  }, []);
 
   // Form Fields - Inventory & Codes
   const [sku, setSku] = useState('');
@@ -79,10 +147,15 @@ export default function AddProductPage() {
 
   // Form Fields - Brand
   const [selectedBrandId, setSelectedBrandId] = useState('');
+  const [showQuickAddBrand, setShowQuickAddBrand] = useState(false);
+  const [quickBrandNameAr, setQuickBrandNameAr] = useState('');
+  const [quickBrandNameEn, setQuickBrandNameEn] = useState('');
+  const [quickBrandLoading, setQuickBrandLoading] = useState(false);
 
-  // Form Fields - Media & Gallery
-  const [coverImageUrl, setCoverImageUrl] = useState('');
-  const [galleryImages, setGalleryImages] = useState(['']);
+  // Form Fields - Advanced Media Assets (Cover, Gallery <= 9, Video <= 2)
+  const [coverMedia, setCoverMedia] = useState(null); // { previewUrl, uploadedUrl, formattedSize, savingsPercent, width, height, ... }
+  const [galleryMedia, setGalleryMedia] = useState([]); // Array of max 9 items
+  const [videoMedia, setVideoMedia] = useState([]); // Array of max 2 items
 
   // Form Fields - Technical Specifications
   const [specifications, setSpecifications] = useState([
@@ -92,6 +165,10 @@ export default function AddProductPage() {
 
   // Form Fields - Tags
   const [selectedTagIds, setSelectedTagIds] = useState([]);
+  const [showQuickAddTag, setShowQuickAddTag] = useState(false);
+  const [quickTagNameAr, setQuickTagNameAr] = useState('');
+  const [quickTagNameEn, setQuickTagNameEn] = useState('');
+  const [quickTagLoading, setQuickTagLoading] = useState(false);
 
   // Form Fields - Visibility
   const [isActive, setIsActive] = useState(true);
@@ -154,11 +231,11 @@ export default function AddProductPage() {
     } else if (session?.user) {
       setTimeout(() => {
         setAdminUser(session.user);
-      }, 10)
+      }, 10);
     } else {
       setTimeout(() => {
         setAdminUser({ name: 'مدير المتجر', email: 'admin@trendlineeg.com', role: 'SUPER_ADMIN' });
-      }, 10)
+      }, 10);
     }
   }, [session, status, router]);
 
@@ -218,7 +295,7 @@ export default function AddProductPage() {
   useEffect(() => {
     setTimeout(() => {
       fetchPrerequisites();
-    }, 20)
+    }, 20);
   }, [fetchPrerequisites]);
 
   // Auto-slug sync when typing English name
@@ -254,6 +331,53 @@ export default function AddProductPage() {
     };
   }, [costPrice, originalPrice, salePrice]);
 
+  // Quick Preset Handlers for Discount Expiration
+  const setSaleEndPreset = (days) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    d.setHours(23, 59, 0, 0);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    setSaleEndsAt(`${year}-${month}-${day}T${hours}:${minutes}`);
+  };
+
+  const setSaleEndMonth = () => {
+    const d = new Date();
+    const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59);
+    const year = endOfMonth.getFullYear();
+    const month = String(endOfMonth.getMonth() + 1).padStart(2, '0');
+    const day = String(endOfMonth.getDate()).padStart(2, '0');
+    const hours = String(endOfMonth.getHours()).padStart(2, '0');
+    const minutes = String(endOfMonth.getMinutes()).padStart(2, '0');
+    setSaleEndsAt(`${year}-${month}-${day}T${hours}:${minutes}`);
+  };
+
+  const saleRemainingText = useMemo(() => {
+    if (!saleEndsAt || !nowTimestamp) return null;
+    const target = new Date(saleEndsAt);
+    const diffMs = target.getTime() - nowTimestamp;
+    if (diffMs <= 0) {
+      return { expired: true, text: isRtl ? 'انتهت فترة الخصم المحددة' : 'Discount expired' };
+    }
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    if (diffDays > 0) {
+      return {
+        expired: false,
+        text: isRtl
+          ? `ينتهي الخصم بعد ${diffDays} يوم${diffDays > 1 ? 'اً' : ''} و ${diffHours} ساعة`
+          : `Ends in ${diffDays}d ${diffHours}h`,
+      };
+    }
+    return {
+      expired: false,
+      text: isRtl ? `ينتهي الخصم خلال ${diffHours} ساعة` : `Ends in ${diffHours}h`,
+    };
+  }, [saleEndsAt, nowTimestamp, isRtl]);
+
   // Brand Options for CustomSelect
   const brandOptions = useMemo(() => {
     const genericOption = {
@@ -273,6 +397,36 @@ export default function AddProductPage() {
     return [genericOption, ...list];
   }, [brands, isRtl]);
 
+  // Root Category Options for Root Category Selector
+  const rootCategoryOptions = useMemo(() => {
+    const defaultPlaceholder = {
+      value: '',
+      label: isRtl ? '-- اختر القسم الرئيسي أولاً لاستعراض أقسامه الفرعية --' : '-- Select Parent Category first --',
+      icon: <FaFolderTree style={{ color: '#94a3b8' }} />,
+    };
+
+    const options = categoriesTree.map((root) => ({
+      value: String(root.id),
+      label: isRtl ? root.name_ar : root.name_en,
+      image_url: root.image_url,
+      icon_url: root.icon_url,
+      idBadge: `ID: ${root.id}`,
+    }));
+
+    return [defaultPlaceholder, ...options];
+  }, [categoriesTree, isRtl]);
+
+  // Currently selected root category object and its subcategories
+  const currentRootCategory = useMemo(() => {
+    if (!selectedRootCategoryId) return null;
+    return categoriesTree.find((c) => String(c.id) === String(selectedRootCategoryId)) || null;
+  }, [categoriesTree, selectedRootCategoryId]);
+
+  const availableSubcategories = useMemo(() => {
+    if (!currentRootCategory) return [];
+    return currentRootCategory.subcategories || [];
+  }, [currentRootCategory]);
+
   // Code Generators
   const generateSkuCode = () => {
     const prefix = 'TRD';
@@ -287,8 +441,20 @@ export default function AddProductPage() {
     setBarcode(`${prefix}${rand}`);
   };
 
-  // Category Multi-selection handlers
+  // Category Multi-selection handlers: Products can ONLY be assigned to subcategories
   const toggleCategorySelection = (categoryId) => {
+    // Check if this category is a root category
+    const isRoot = categoriesTree.some((root) => String(root.id) === String(categoryId));
+    if (isRoot) {
+      toast.warning(
+        isRtl
+          ? 'لا يمكن إضافة المنتج في قسم رئيسي مباشرة! يرجى اختيار قسم فرعي تابع له.'
+          : 'Products cannot be assigned directly to a root category! Please select a subcategory.',
+        isRtl ? 'تنبيه التسلسل الهرمي' : 'Hierarchy Rule'
+      );
+      return;
+    }
+
     setCategoryValidationError(false);
     setSelectedCategoryIds((prev) => {
       let updated;
@@ -311,7 +477,17 @@ export default function AddProductPage() {
 
   const setAsPrimaryCategory = (categoryId, e) => {
     if (e) e.stopPropagation();
-    // Ensure it is in selected list first
+    const isRoot = categoriesTree.some((root) => String(root.id) === String(categoryId));
+    if (isRoot) {
+      toast.warning(
+        isRtl
+          ? 'لا يمكن تعيين قسم رئيسي كقسم أساسي للمنتج! يجب أن يكون قسماً فرعياً.'
+          : 'Root categories cannot be set as primary. Please choose a subcategory.',
+        isRtl ? 'تنبيه التسلسل الهرمي' : 'Hierarchy Rule'
+      );
+      return;
+    }
+
     if (!selectedCategoryIds.includes(categoryId)) {
       setSelectedCategoryIds((prev) => [...prev, categoryId]);
     }
@@ -328,11 +504,9 @@ export default function AddProductPage() {
   const activeBreadcrumbTrail = useMemo(() => {
     if (!primaryCategoryId) return null;
 
-    // Find the category in flat categories
     const target = flatCategories.find((c) => String(c.id) === String(primaryCategoryId));
     if (!target) return null;
 
-    // If it has a parent, trace hierarchy: Root -> Subcategory
     if (target.parent_id) {
       const parent = flatCategories.find((c) => String(c.id) === String(target.parent_id));
       return {
@@ -341,7 +515,6 @@ export default function AddProductPage() {
       };
     }
 
-    // Root category itself
     return {
       rootName: isRtl ? target.name_ar : target.name_en,
       subName: null,
@@ -393,31 +566,428 @@ export default function AddProductPage() {
     setSpecifications((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Additional Gallery Handlers
-  const handleGalleryChange = (index, value) => {
-    setGalleryImages((prev) => {
-      const copy = [...prev];
-      copy[index] = value;
-      return copy;
-    });
-  };
-
-  const addGalleryRow = () => {
-    setGalleryImages((prev) => [...prev, '']);
-  };
-
-  const removeGalleryRow = (index) => {
-    setGalleryImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
   // Tag Pill Toggle
   const toggleTagPill = (tagId) => {
+    const idStr = String(tagId);
     setSelectedTagIds((prev) =>
-      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+      prev.map(String).includes(idStr)
+        ? prev.filter((id) => String(id) !== idStr)
+        : [...prev, tagId]
     );
   };
 
-  // Validation
+  // Quick Add Brand (Arabic and English name only)
+  const handleQuickAddBrand = async (e) => {
+    e?.preventDefault();
+    if (!quickBrandNameAr.trim() || !quickBrandNameEn.trim()) {
+      toast.warning(
+        isRtl ? 'يرجى كتابة اسم البراند بالعربية والإنجليزية' : 'Please provide both Arabic and English brand names',
+        isRtl ? 'بيانات ناقصة' : 'Missing Fields'
+      );
+      return;
+    }
+
+    try {
+      setQuickBrandLoading(true);
+      const token = await ensureAuthToken();
+      const apiHost = getApiHost();
+
+      const payload = {
+        name_ar: quickBrandNameAr.trim(),
+        name_en: quickBrandNameEn.trim(),
+        slug: quickBrandNameEn.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+        logo_url: '/icons/category-default.svg',
+      };
+
+      const res = await fetch(`${apiHost}/api/v1/catalog/brands`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success && data.data) {
+        const createdBrand = data.data;
+        setBrands((prev) => [createdBrand, ...prev]);
+        setSelectedBrandId(String(createdBrand.id));
+        setQuickBrandNameAr('');
+        setQuickBrandNameEn('');
+        setShowQuickAddBrand(false);
+
+        toast.success(
+          isRtl
+            ? `تمت إضافة البراند "${createdBrand.name_ar}" واختياره للمنتج!`
+            : `Brand "${createdBrand.name_en}" added and selected!`,
+          isRtl ? 'إضافة سريعة للبراند' : 'Brand Added'
+        );
+      } else {
+        toast.error(
+          data.message || (isRtl ? 'تعذر إنشاء البراند' : 'Failed to create brand'),
+          isRtl ? 'خطأ' : 'Error'
+        );
+      }
+    } catch (err) {
+      console.error('Error in quick adding brand:', err);
+      toast.error(
+        isRtl ? 'حدث خطأ أثناء الاتصال بالخادم' : 'Server connection error',
+        isRtl ? 'خطأ' : 'Error'
+      );
+    } finally {
+      setQuickBrandLoading(false);
+    }
+  };
+
+  // Quick Add Tag (Arabic and English name)
+  const handleQuickAddTag = async (e) => {
+    e?.preventDefault();
+    if (!quickTagNameAr.trim() || !quickTagNameEn.trim()) {
+      toast.warning(
+        isRtl ? 'يرجى كتابة اسم الوسم بالعربية والإنجليزية' : 'Please provide both Arabic and English tag names',
+        isRtl ? 'بيانات ناقصة' : 'Missing Fields'
+      );
+      return;
+    }
+
+    try {
+      setQuickTagLoading(true);
+      const token = await ensureAuthToken();
+      const apiHost = getApiHost();
+
+      const payload = {
+        name_ar: quickTagNameAr.trim(),
+        name_en: quickTagNameEn.trim(),
+        slug: quickTagNameEn.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+      };
+
+      const res = await fetch(`${apiHost}/api/v1/catalog/tags`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success && data.data) {
+        const createdTag = data.data;
+        setAvailableTags((prev) => {
+          if (prev.some((t) => t.id === createdTag.id)) return prev;
+          return [...prev, createdTag];
+        });
+        setSelectedTagIds((prev) =>
+          prev.includes(createdTag.id) ? prev : [...prev, createdTag.id]
+        );
+        setQuickTagNameAr('');
+        setQuickTagNameEn('');
+        setShowQuickAddTag(false);
+
+        toast.success(
+          isRtl
+            ? `تمت إضافة الوسم "${createdTag.name_ar}" وتحديده للمنتج!`
+            : `Tag "${createdTag.name_en}" added and selected!`,
+          isRtl ? 'إضافة سريعة للوسم' : 'Tag Added'
+        );
+      } else {
+        toast.error(
+          data.message || (isRtl ? 'تعذر إنشاء الوسم' : 'Failed to create tag'),
+          isRtl ? 'خطأ' : 'Error'
+        );
+      }
+    } catch (err) {
+      console.error('Error in quick adding tag:', err);
+      toast.error(
+        isRtl ? 'حدث خطأ أثناء الاتصال بالخادم' : 'Server connection error',
+        isRtl ? 'خطأ' : 'Error'
+      );
+    } finally {
+      setQuickTagLoading(false);
+    }
+  };
+
+  // =========================================================================
+  // Upload Helper (Saves to server /uploads/products/ via Next.js API)
+  // =========================================================================
+  const uploadMediaFile = async (file, mediaType = 'image') => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('mediaType', mediaType);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn('Background upload note:', err);
+    }
+    return null;
+  };
+
+  // =========================================================================
+  // MEDIA HANDLER: Primary Cover Image (Processed through formatFactory WebP 80%)
+  // =========================================================================
+  const handleCoverSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setCoverLoading(true);
+      setMediaError('');
+      setMediaNotice('');
+
+      // Run formatFactory on the image
+      const result = await formatFactory(file, { quality: 0.8 });
+
+      const tempCover = {
+        previewUrl: result.previewUrl,
+        originalName: result.originalName,
+        formattedName: result.formattedName,
+        originalSize: result.originalSize,
+        formattedSize: result.formattedSize,
+        savingsPercent: result.savingsPercent,
+        width: result.width,
+        height: result.height,
+        uploading: true,
+        uploadedUrl: '',
+      };
+      setCoverMedia(tempCover);
+
+      // Upload formatted WebP to server in background
+      const uploadRes = await uploadMediaFile(result.file, 'image');
+      const uploadedUrl = uploadRes?.url || (typeof uploadRes === 'string' ? uploadRes : null);
+      setCoverMedia((prev) =>
+        prev
+          ? {
+            ...prev,
+            uploadedUrl: uploadedUrl || prev.previewUrl,
+            uploading: false,
+          }
+          : null
+      );
+    } catch (err) {
+      console.error('Cover processing error:', err);
+      setMediaError(err.message || 'حدث خطأ أثناء معالجة غلاف المنتج');
+    } finally {
+      setCoverLoading(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  const removeCoverImage = () => {
+    setCoverMedia(null);
+  };
+
+  // =========================================================================
+  // MEDIA HANDLER: Additional Gallery Images (Max 9 Images)
+  // =========================================================================
+  const handleGallerySelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const currentCount = galleryMedia.length;
+    const availableSlots = 9 - currentCount;
+
+    if (availableSlots <= 0) {
+      setMediaError(isRtl ? 'تم بلوغ الحد الأقصى لمعرض الصور (9 صور إضافية كحد أقصى).' : 'Maximum 9 gallery images reached.');
+      return;
+    }
+
+    const filesToProcess = files.slice(0, availableSlots);
+    if (files.length > availableSlots) {
+      setMediaNotice(
+        isRtl
+          ? `تم قبول ${availableSlots} صور فقط لبلوغ السقف المحدد (9 صور كحد أقصى).`
+          : `Only ${availableSlots} image(s) processed to adhere to the 9-image limit.`
+      );
+    }
+
+    setGalleryLoading(true);
+    setMediaError('');
+
+    for (const file of filesToProcess) {
+      try {
+        const result = await formatFactory(file, { quality: 0.8 });
+        const tempId = `gal_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+        const newMediaItem = {
+          id: tempId,
+          previewUrl: result.previewUrl,
+          originalName: result.originalName,
+          formattedName: result.formattedName,
+          originalSize: result.originalSize,
+          formattedSize: result.formattedSize,
+          savingsPercent: result.savingsPercent,
+          width: result.width,
+          height: result.height,
+          uploading: true,
+          uploadedUrl: '',
+        };
+
+        setGalleryMedia((prev) => [...prev, newMediaItem]);
+
+        // Background server upload
+        uploadMediaFile(result.file, 'image').then((uploadRes) => {
+          const uploadedUrl = uploadRes?.url || (typeof uploadRes === 'string' ? uploadRes : null);
+          setGalleryMedia((prev) =>
+            prev.map((item) =>
+              item.id === tempId
+                ? { ...item, uploadedUrl: uploadedUrl || item.previewUrl, uploading: false }
+                : item
+            )
+          );
+        });
+      } catch (err) {
+        console.error('Gallery image error:', err);
+        setMediaError(err.message || 'حدث خطأ أثناء معالجة وضغط صورة المعرض');
+      }
+    }
+
+    setGalleryLoading(false);
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
+  };
+
+  const removeGalleryImage = (index) => {
+    setGalleryMedia((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Quick Action: Swap Gallery Image to Cover Image
+  const makeGalleryImageCover = (galleryIndex) => {
+    const target = galleryMedia[galleryIndex];
+    if (!target) return;
+
+    const oldCover = coverMedia;
+    setCoverMedia({
+      ...target,
+      id: undefined,
+    });
+
+    const remaining = galleryMedia.filter((_, idx) => idx !== galleryIndex);
+    if (oldCover) {
+      setGalleryMedia([
+        ...remaining,
+        {
+          ...oldCover,
+          id: `gal_${Date.now()}`,
+        },
+      ]);
+    } else {
+      setGalleryMedia(remaining);
+    }
+  };
+
+  // =========================================================================
+  // MEDIA HANDLER: Product Videos (Max 2 Videos, Max 60s, 720p HD)
+  // =========================================================================
+  const handleVideoSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (videoMedia.length >= 2) {
+      const msg = isRtl ? 'تم بلوغ الحد الأقصى لمقاطع الفيديو (مقطعان كحد أقصى للمنتج).' : 'Maximum 2 product videos reached.';
+      setMediaError(msg);
+      toast.warning(msg, isRtl ? 'تنبيه الوسائط' : 'Media Limit');
+      return;
+    }
+
+    const file = files[0];
+    setVideoLoading(true);
+    setMediaError('');
+    setMediaNotice('');
+
+    try {
+      // Process through formatFactory with 60s and 720p enforcement
+      const result = await formatFactory(file, { maxDurationSec: 60 });
+
+      if (!result.success) {
+        const msg = result.error || 'تعذر معالجة ملف الفيديو';
+        setMediaError(msg);
+        toast.error(msg, isRtl ? 'خطأ في معالجة الفيديو' : 'Video Error');
+        return;
+      }
+
+      const tempId = `vid_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const newVideoItem = {
+        id: tempId,
+        previewUrl: result.previewUrl,
+        posterUrl: result.posterUrl,
+        originalName: result.originalName,
+        size: result.originalSize,
+        duration: result.duration,
+        durationFormatted: result.durationFormatted,
+        resolutionBadge: result.resolutionBadge,
+        width: result.width,
+        height: result.height,
+        isScaledDown: result.isScaledDown,
+        uploading: true,
+        uploadedUrl: '',
+      };
+
+      setVideoMedia((prev) => [...prev, newVideoItem]);
+      toast.success(
+        isRtl
+          ? `تم قبول ومعالجة الفيديو (${result.durationFormatted}) بدقة ${result.resolutionBadge} بنجاح`
+          : `Video processed successfully (${result.durationFormatted}) at ${result.resolutionBadge}`,
+        isRtl ? 'معالجة الفيديو' : 'Video Success'
+      );
+
+      // Upload video to server in background (compressed & resized to 720p via FFmpeg)
+      uploadMediaFile(file, 'video').then((uploadRes) => {
+        const uploadedUrl = uploadRes?.url || (typeof uploadRes === 'string' ? uploadRes : null);
+        const finalSize = uploadRes?.size;
+        const savingsPercent = uploadRes?.savingsPercent;
+        setVideoMedia((prev) =>
+          prev.map((item) =>
+            item.id === tempId
+              ? {
+                  ...item,
+                  uploadedUrl: uploadedUrl || item.previewUrl,
+                  size: finalSize || item.size,
+                  savingsPercent: savingsPercent || 0,
+                  resolutionBadge: uploadRes?.resolutionBadge || '720p HD Optimized',
+                  uploading: false,
+                }
+              : item
+          )
+        );
+
+        if (finalSize && uploadRes?.isCompressed) {
+          toast.success(
+            isRtl
+              ? `تم ضغط الفيديو وتخفيضه إلى 720p بنجاح (الحجم الجديد: ${formatBytes(finalSize)})`
+              : `Video compressed to 720p (${formatBytes(finalSize)})`,
+            isRtl ? 'ضغط الفيديو' : 'Video Compressed'
+          );
+        }
+      });
+    } catch (err) {
+      console.error('Video error:', err);
+      const msg = err.message || 'حدث خطأ أثناء فحص ومعالجة الفيديو';
+      setMediaError(msg);
+      toast.error(msg, isRtl ? 'تنبيه فحص الفيديو' : 'Video Validation Error');
+    } finally {
+      setVideoLoading(false);
+      if (videoInputRef.current) videoInputRef.current.value = '';
+    }
+  };
+
+  const removeVideo = (index) => {
+    setVideoMedia((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Validation Check
   const isFormValid = useMemo(() => {
     return (
       nameAr.trim().length > 0 &&
@@ -461,16 +1031,28 @@ export default function AddProductPage() {
         }
       });
 
-      // Build Images Array
+      // Build Image URLs Payload (Cover first, followed by up to 9 gallery images)
       const imagesPayload = [];
-      if (coverImageUrl.trim()) {
-        imagesPayload.push(coverImageUrl.trim());
+      if (coverMedia?.uploadedUrl || coverMedia?.previewUrl) {
+        imagesPayload.push(coverMedia.uploadedUrl || coverMedia.previewUrl);
       }
-      galleryImages.forEach((url) => {
-        if (url.trim() && !imagesPayload.includes(url.trim())) {
-          imagesPayload.push(url.trim());
+      galleryMedia.forEach((g) => {
+        const url = g.uploadedUrl || g.previewUrl;
+        if (url && !imagesPayload.includes(url)) {
+          imagesPayload.push(url);
         }
       });
+
+      // Build Video URLs Payload (Up to 2 videos, max 60s, 720p HD)
+      const videosPayload = videoMedia.map((v) => ({
+        url: v.uploadedUrl || v.previewUrl,
+        poster_url: v.posterUrl,
+        duration: v.duration,
+        duration_formatted: v.durationFormatted,
+        resolution: v.resolutionBadge,
+        name: v.originalName,
+        size: v.size,
+      }));
 
       const payload = {
         name_ar: nameAr.trim(),
@@ -484,14 +1066,19 @@ export default function AddProductPage() {
         cost_price: parseFloat(costPrice) || 0.0,
         original_price: parseFloat(originalPrice),
         sale_price: salePrice ? parseFloat(salePrice) : null,
+        sale_ends_at: saleEndsAt ? new Date(saleEndsAt).toISOString() : null,
         stock_quantity: parseInt(stockQuantity, 10) || 0,
         low_stock_threshold: parseInt(lowStockThreshold, 10) || 5,
         short_desc_ar: shortDescAr.trim() || null,
         short_desc_en: shortDescEn.trim() || null,
         description_ar: descriptionAr.trim() || null,
         description_en: descriptionEn.trim() || null,
-        specifications: Object.keys(specsObject).length > 0 ? specsObject : null,
+        specifications: {
+          ...specsObject,
+          ...(videosPayload.length > 0 ? { media_videos: videosPayload } : {}),
+        },
         image_urls: imagesPayload,
+        video_urls: videosPayload,
         tag_ids: selectedTagIds,
         is_featured: isFeatured,
         is_active: publishImmediately ? isActive : false,
@@ -512,21 +1099,22 @@ export default function AddProductPage() {
         throw new Error(data.message || (isRtl ? 'حدث خطأ أثناء حفظ المنتج' : 'Failed to save product'));
       }
 
-      setSuccessMessage(isRtl ? ' تم حفظ المنتج بنجاح! يتم التحويل إلى قائمة المنتجات...' : ' Product created successfully! Redirecting...');
+      const successText = isRtl ? 'تم حفظ ونشر المنتج بنجاح! يتم التحويل إلى قائمة المنتجات...' : 'Product created successfully! Redirecting...';
+      setSuccessMessage(successText);
+      toast.success(successText, isRtl ? 'إضافة منتج' : 'Product Created');
       setTimeout(() => {
         router.push('/admin/products');
       }, 1200);
     } catch (err) {
       console.error('Save product error:', err);
+      let errorText = err.message || (isRtl ? 'تعذر حفظ المنتج، تحقق من البيانات والاتصال بالخادم' : 'Failed to save product');
       if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-        setErrorMessage(
-          isRtl
-            ? 'تعذر الاتصال بالخادم. يرجى التأكد من تشغيل خادم الباك إند (Port 5000).'
-            : 'Could not connect to server. Please verify backend is running on port 5000.'
-        );
-      } else {
-        setErrorMessage(err.message || (isRtl ? 'تعذر حفظ المنتج، تحقق من البيانات والاتصال بالخادم' : 'Failed to save product'));
+        errorText = isRtl
+          ? 'تعذر الاتصال بالخادم. يرجى التأكد من تشغيل خادم الباك إند (Port 5000).'
+          : 'Could not connect to server. Please verify backend is running on port 5000.';
       }
+      setErrorMessage(errorText);
+      toast.error(errorText, isRtl ? 'خطأ في الحفظ' : 'Submission Error');
     } finally {
       setSubmitting(false);
     }
@@ -562,7 +1150,7 @@ export default function AddProductPage() {
               <span className="separator">/</span>
               <Link href="/admin/products">{isRtl ? 'المنتجات' : 'Products'}</Link>
               <span className="separator">/</span>
-              <span className="current-crumb">{isRtl ? 'إضافة منتج جديد' : 'New Product'}</span>
+              <span className="current-crumb">{isRtl ? 'إضافة منتج متكامل' : 'New Product'}</span>
             </div>
 
             <div className="top-action-buttons">
@@ -591,13 +1179,13 @@ export default function AddProductPage() {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <span>{isRtl ? 'جارٍ النشر في المتجر...' : 'Publishing...'}</span>
+                  <span>{isRtl ? 'جارٍ المعالجة والنشر...' : 'Publishing...'}</span>
                 ) : (
                   <>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
-                    <span>{isRtl ? 'نشر المنتج الآن' : 'Publish Product'}</span>
+                    <span>{isRtl ? 'نشر المنتج في المتجر' : 'Publish Product'}</span>
                   </>
                 )}
               </button>
@@ -606,39 +1194,15 @@ export default function AddProductPage() {
 
           {/* Feedback Alerts */}
           {errorMessage && (
-            <div
-              style={{
-                backgroundColor: '#fee2e2',
-                color: '#b91c1c',
-                border: '1px solid #f87171',
-                padding: '12px 18px',
-                borderRadius: '12px',
-                fontSize: '13.5px',
-                fontWeight: '700',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
+            <div className="alert-message-banner alert-error">
+              <FaTriangleExclamation />
               <span>{errorMessage}</span>
             </div>
           )}
 
           {successMessage && (
-            <div
-              style={{
-                backgroundColor: '#dcfce7',
-                color: '#15803d',
-                border: '1px solid #86efac',
-                padding: '12px 18px',
-                borderRadius: '12px',
-                fontSize: '13.5px',
-                fontWeight: '800',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
+            <div className="alert-message-banner alert-success">
+              <FaCircleCheck />
               <span>{successMessage}</span>
             </div>
           )}
@@ -646,7 +1210,7 @@ export default function AddProductPage() {
           {/* Two-Column Form Layout */}
           <div className="product-form-layout">
             {/* ==============================================================
-                MAIN COLUMN (Left in RTL, Right in LTR)
+                MAIN COLUMN
                ============================================================== */}
             <div className="form-main-column">
               {/* Card 1: Basic Information */}
@@ -663,9 +1227,16 @@ export default function AddProductPage() {
                         <line x1="3" y1="18" x2="3.01" y2="18"></line>
                       </svg>
                     </div>
-                    <h2>{isRtl ? 'البيانات الأساسية للمنتج' : 'Product Information'}</h2>
-                    <span className="mandatory-tag">{isRtl ? 'أساسي' : 'Required'}</span>
+                    <div>
+                      <h2>{isRtl ? 'البيانات الأساسية والهوية التجارية' : 'Core Product Details'}</h2>
+                      <p className="section-subtitle">
+                        {isRtl
+                          ? 'تحديد الاسم التجاري باللغتين والرابط الدائم وتفاصيل الوصف التسويقي.'
+                          : 'Define multilingual product names, unique slug, and marketing descriptions.'}
+                      </p>
+                    </div>
                   </div>
+                  <span className="mandatory-tag">{isRtl ? 'حقول إجبارية' : 'Required'}</span>
                 </div>
 
                 <div className="form-group-grid">
@@ -677,7 +1248,7 @@ export default function AddProductPage() {
                     <input
                       type="text"
                       required
-                      placeholder={isRtl ? 'مثال: راوتر سيسكو 2960 جيجابت إيثرنت' : 'e.g. Cisco Catalyst 2960 Switch'}
+                      placeholder={isRtl ? 'مثال: سويتش سيسكو كاتاليست 2960 جيجابت إيثرنت' : 'e.g. Cisco Catalyst 2960 Switch'}
                       value={nameAr}
                       onChange={(e) => setNameAr(e.target.value)}
                     />
@@ -691,7 +1262,7 @@ export default function AddProductPage() {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Cisco Catalyst 2960 Switch"
+                      placeholder="e.g. Cisco Catalyst 2960 Gigabit Switch"
                       value={nameEn}
                       onChange={handleNameEnChange}
                     />
@@ -701,22 +1272,21 @@ export default function AddProductPage() {
                 {/* Slug with Auto toggle */}
                 <div className="form-group">
                   <label>
-                    <span>{isRtl ? 'الرابط الدائم (Slug)' : 'URL Slug'}</span>
+                    <span>{isRtl ? 'الرابط الدائم الفريد (URL Slug)' : 'Canonical URL Slug'}</span>
                     <button
                       type="button"
-                      className="label-hint"
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                      className="label-hint-btn"
                       onClick={() => setAutoSlug(!autoSlug)}
+                      title={isRtl ? 'تبديل نمط التوليد' : 'Toggle auto slug generation'}
                     >
-                      {autoSlug
-                        ? (isRtl ? 'توليد تلقائي نشط' : 'Auto Sync Active')
-                        : (isRtl ? 'توليد يدوي' : 'Manual')}
+                      <FaArrowsRotate style={{ fontSize: 11 }} />
+                      <span>{autoSlug ? (isRtl ? 'توليد تلقائي نشط' : 'Auto Sync') : (isRtl ? 'إدخال يدوي مخصص' : 'Manual')}</span>
                     </button>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="cisco-catalyst-2960-switch"
+                    placeholder="cisco-catalyst-2960-gigabit-switch"
                     value={slug}
                     onChange={(e) => {
                       setAutoSlug(false);
@@ -724,7 +1294,7 @@ export default function AddProductPage() {
                     }}
                   />
                   <div className="slug-preview-bar">
-                    <span>{isRtl ? 'رابط المنتج في المتجر:' : 'Storefront URL:'}</span>
+                    <span>{isRtl ? 'المسار الدائم في المتجر:' : 'Storefront URL:'}</span>
                     <span className="slug-highlight">
                       trendlineeg.com/products/{slug || 'product-slug'}
                     </span>
@@ -734,50 +1304,473 @@ export default function AddProductPage() {
                 {/* Short Descriptions */}
                 <div className="form-group-grid">
                   <div className="form-group">
-                    <label>{isRtl ? 'نبذة مختصرة بالعربية' : 'Short Description (Arabic)'}</label>
+                    <label>{isRtl ? 'الموجز التسويقي بالعربية' : 'Short Summary (Arabic)'}</label>
                     <textarea
                       rows={2}
-                      placeholder={isRtl ? 'وصف سريع يظهر أسفل عنوان المنتج في قائمة المتجر...' : 'Quick highlight shown on cards...'}
+                      placeholder={isRtl ? 'موجز سريع يظهر في بطاقات المنتجات ومحركات البحث...' : 'Quick highlight shown on product cards...'}
                       value={shortDescAr}
                       onChange={(e) => setShortDescAr(e.target.value)}
                     />
                   </div>
                   <div className="form-group">
-                    <label>{isRtl ? 'نبذة مختصرة بالإنجليزية' : 'Short Description (English)'}</label>
+                    <label>{isRtl ? 'الموجز التسويقي بالإنجليزية' : 'Short Summary (English)'}</label>
                     <textarea
                       rows={2}
-                      placeholder="Short marketing excerpt for search engines..."
+                      placeholder="Concise commercial summary for search engines and cards..."
                       value={shortDescEn}
                       onChange={(e) => setShortDescEn(e.target.value)}
                     />
                   </div>
                 </div>
 
-                {/* Full Descriptions */}
-                <div className="form-group-grid">
+                {/* Full Descriptions (Powered by React Quill JS - Full Width Flex Column) */}
+                <div className="full-descriptions-flex-col">
                   <div className="form-group">
-                    <label>{isRtl ? 'الوصف الكامل بالعربية' : 'Full Description (Arabic)'}</label>
-                    <textarea
-                      rows={4}
-                      placeholder={isRtl ? 'تفاصيل المنتج ومميزاته ومحتويات العبوة...' : 'Comprehensive specifications and features...'}
+                    <label>
+                      <span>{isRtl ? 'الوصف الكامل بالعربية' : 'Detailed Description (Arabic)'}</span>
+                      <span className="quill-indicator-pill">React Quill JS (RTL)</span>
+                    </label>
+                    <QuillEditor
                       value={descriptionAr}
-                      onChange={(e) => setDescriptionAr(e.target.value)}
+                      onChange={(content) => setDescriptionAr(content)}
+                      placeholder={
+                        isRtl
+                          ? 'المواصفات الكاملة للمنتج، الميزات التقنية، محتويات العلبة...'
+                          : 'Comprehensive specifications, features, package contents...'
+                      }
+                      dir="rtl"
+                      minHeight="180px"
                     />
                   </div>
+
                   <div className="form-group">
-                    <label>{isRtl ? 'الوصف الكامل بالإنجليزية' : 'Full Description (English)'}</label>
-                    <textarea
-                      rows={4}
-                      placeholder="Comprehensive product details, package contents..."
+                    <label>
+                      <span>{isRtl ? 'الوصف الكامل بالإنجليزية' : 'Detailed Description (English)'}</span>
+                      <span className="quill-indicator-pill">React Quill JS (LTR)</span>
+                    </label>
+                    <QuillEditor
                       value={descriptionEn}
-                      onChange={(e) => setDescriptionEn(e.target.value)}
+                      onChange={(content) => setDescriptionEn(content)}
+                      placeholder="Comprehensive product features, technical capabilities, and package items..."
+                      dir="ltr"
+                      minHeight="180px"
                     />
                   </div>
                 </div>
               </div>
 
               {/* ==============================================================
-                  Card 2: CATEGORY HIERARCHY TREE SELECTOR (CORE REQUIREMENT)
+                  Card 2: ADVANCED MEDIA ASSETS HUB (Cover + Gallery 9 + Video 2)
+                 ============================================================== */}
+              <div className="form-section-card media-hub-card">
+                <div className="section-header">
+                  <div className="title-wrap">
+                    <div className="section-icon media-hub-icon">
+                      <FaImage />
+                    </div>
+                    <div>
+                      <h2>{isRtl ? 'إدارة الوسائط المرئية ومحرك الضغط formatFactory' : 'Visual Media & formatFactory Engine'}</h2>
+                      <p className="section-subtitle">
+                        {isRtl
+                          ? 'غلاف رئيسي، حتى 9 صور إضافية بتقنية WebP بجودة 80%، ومقطعان فيديو بدقة 720p ومدى زمني حتى دقيقة.'
+                          : 'Cover thumbnail, up to 9 WebP 80% gallery images, and up to 2 product videos (max 60s, 720p HD).'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="format-factory-badge">
+                    <FaWandMagicSparkles />
+                    <span>formatFactory: WebP 80% & 720p HD</span>
+                  </div>
+                </div>
+
+                {mediaError && (
+                  <div className="media-feedback-alert error">
+                    <FaTriangleExclamation />
+                    <span>{mediaError}</span>
+                    <button type="button" onClick={() => setMediaError('')} className="btn-close-alert"><FaXmark /></button>
+                  </div>
+                )}
+
+                {mediaNotice && (
+                  <div className="media-feedback-alert notice">
+                    <FaCircleCheck />
+                    <span>{mediaNotice}</span>
+                    <button type="button" onClick={() => setMediaNotice('')} className="btn-close-alert"><FaXmark /></button>
+                  </div>
+                )}
+
+                {/* Sub-Section A: Primary Cover Image */}
+                <div className="media-sub-section">
+                  <div className="sub-section-title-row">
+                    <div className="sub-title">
+                      <FaStar className="star-icon" />
+                      <span>{isRtl ? 'غلاف المنتج الرئيسي (Cover Image)' : 'Primary Product Cover Image'}</span>
+                      <span className="badge-mandatory">{isRtl ? 'مستحسن للمتجر' : 'Recommended'}</span>
+                    </div>
+                    {coverMedia && (
+                      <span className="media-status-pill success">
+                        <FaCircleCheck />
+                        <span>{isRtl ? 'محول WebP بنجاح' : 'WebP Optimized'}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="sub-instruction-text">
+                    {isRtl
+                      ? 'الصورة البارزة الأساسية التي ستظهر في نتائج البحث وبطاقات الكتالوج ومنشورات التواصل الاجتماعي.'
+                      : 'The main hero thumbnail shown on search cards, catalog grids, and social share cards.'}
+                  </p>
+
+                  <div className="cover-uploader-wrapper">
+                    {coverMedia ? (
+                      <div className="cover-active-card">
+                        <div className="cover-preview-canvas">
+                          <img
+                            src={coverMedia.previewUrl || coverMedia.uploadedUrl}
+                            alt="Cover Preview"
+                            onError={(e) => {
+                              e.target.src = '/icons/fallback-product.svg';
+                            }}
+                          />
+                          <div className="cover-badge-float">
+                            <span>{isRtl ? 'الغلاف النشط' : 'Active Cover'}</span>
+                          </div>
+                        </div>
+
+                        <div className="cover-details-panel">
+                          <div className="file-meta-row">
+                            <strong className="file-name">{coverMedia.originalName}</strong>
+                            <span className="file-format-tag">WebP 80%</span>
+                          </div>
+
+                          <div className="media-specs-grid">
+                            <div className="spec-metric">
+                              <span className="lbl">{isRtl ? 'الحجم المضغوط:' : 'Optimized Size:'}</span>
+                              <strong className="val">{formatBytes(coverMedia.formattedSize)}</strong>
+                            </div>
+                            {coverMedia.savingsPercent > 0 && (
+                              <div className="spec-metric savings">
+                                <span className="lbl">{isRtl ? 'نسبة الوفر:' : 'Size Saved:'}</span>
+                                <strong className="val">-{coverMedia.savingsPercent}%</strong>
+                              </div>
+                            )}
+                            {coverMedia.width && (
+                              <div className="spec-metric">
+                                <span className="lbl">{isRtl ? 'الأبعاد:' : 'Dimensions:'}</span>
+                                <strong className="val">{coverMedia.width} × {coverMedia.height}px</strong>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="cover-actions-row">
+                            <button
+                              type="button"
+                              className="btn-replace-media"
+                              onClick={() => coverInputRef.current?.click()}
+                              disabled={coverLoading}
+                            >
+                              <FaArrowsRotate />
+                              <span>{isRtl ? 'استبدال الغلاف' : 'Replace Cover'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn-delete-media"
+                              onClick={removeCoverImage}
+                              title={isRtl ? 'حذف صورة الغلاف' : 'Remove Cover'}
+                            >
+                              <FaTrashCan />
+                              <span>{isRtl ? 'حذف' : 'Remove'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="cover-dropzone-box"
+                        onClick={() => coverInputRef.current?.click()}
+                      >
+                        <input
+                          type="file"
+                          ref={coverInputRef}
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handleCoverSelect}
+                        />
+                        <div className="dropzone-center-content">
+                          <div className="dropzone-icon-circle">
+                            <FaCloudArrowUp />
+                          </div>
+                          <h4>{isRtl ? 'انقر لاختيار غلاف المنتج أو اسحب الصورة هنا' : 'Click to select or drag product cover image'}</h4>
+                          <p>
+                            {isRtl
+                              ? 'يقوم محرك formatFactory تلقائياً بتحويل الصورة لصيغة WebP المضغوطة بجودة 80% لتسريع التصفح.'
+                              : 'formatFactory will auto-convert your image to 80% WebP for instant load times.'}
+                          </p>
+                          <span className="specs-pill">{isRtl ? 'يدعم: PNG, JPG, JPEG, WEBP, AVIF' : 'Supports all major image formats'}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sub-Section B: Additional Gallery Images (Max 9 Images) */}
+                <div className="media-sub-section">
+                  <div className="sub-section-title-row">
+                    <div className="sub-title">
+                      <FaImage className="gallery-icon" />
+                      <span>{isRtl ? 'معرض الصور الإضافية' : 'Additional Gallery Images'}</span>
+                      <span className="counter-pill">{galleryMedia.length} / 9 {isRtl ? 'صور' : 'images'}</span>
+                    </div>
+
+                    {galleryMedia.length < 9 && (
+                      <button
+                        type="button"
+                        className="btn-add-gallery-trigger"
+                        onClick={() => galleryInputRef.current?.click()}
+                        disabled={galleryLoading}
+                      >
+                        <FaPlus />
+                        <span>{isRtl ? 'إضافة صور إضافية' : 'Add Gallery Images'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="sub-instruction-text">
+                    {isRtl
+                      ? 'يمكنك إضافة حتى 9 صور إضافية بزوايا وتفاصيل مختلفة للمنتج. يتم ضغط جميع الصور تلقائياً عبر formatFactory.'
+                      : 'Upload up to 9 supplemental product views. All assets are automatically formatted to WebP 80%.'}
+                  </p>
+
+                  <input
+                    type="file"
+                    ref={galleryInputRef}
+                    accept="image/*"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleGallerySelect}
+                  />
+
+                  {galleryMedia.length === 0 ? (
+                    <div
+                      className="gallery-empty-dropzone"
+                      onClick={() => galleryInputRef.current?.click()}
+                    >
+                      <FaImage />
+                      <span>{isRtl ? 'لا توجد صور إضافية مضافة بعد. انقر لإضافة صور للمعرض (بحد أقصى 9 صور).' : 'No gallery images yet. Click to add up to 9 images.'}</span>
+                    </div>
+                  ) : (
+                    <div className="gallery-cards-grid">
+                      {galleryMedia.map((item, gIdx) => (
+                        <div key={item.id || gIdx} className="gallery-thumb-card">
+                          <div className="thumb-preview-box">
+                            <img
+                              src={item.previewUrl || item.uploadedUrl}
+                              alt={`Gallery ${gIdx + 1}`}
+                              onError={(e) => {
+                                e.target.src = '/icons/fallback-product.svg';
+                              }}
+                            />
+                            <span className="thumb-index-tag">#{gIdx + 1}</span>
+
+                            <div className="thumb-overlay-actions">
+                              <button
+                                type="button"
+                                className="action-btn-pill make-cover"
+                                onClick={() => makeGalleryImageCover(gIdx)}
+                                title={isRtl ? 'تعيين كغلاف رئيسي' : 'Set as primary cover'}
+                              >
+                                <FaStar />
+                                <span>{isRtl ? 'جعله غلاف' : 'Make Cover'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="action-btn-pill delete"
+                                onClick={() => removeGalleryImage(gIdx)}
+                                title={isRtl ? 'حذف هذه الصورة' : 'Remove image'}
+                              >
+                                <FaTrashCan />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="thumb-meta-footer">
+                            <span className="thumb-format">WebP 80%</span>
+                            <span className="thumb-size">{formatBytes(item.formattedSize)}</span>
+                            {item.savingsPercent > 0 && (
+                              <span className="thumb-savings">-{item.savingsPercent}%</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {galleryMedia.length < 9 && (
+                        <div
+                          className="gallery-add-slot-card"
+                          onClick={() => galleryInputRef.current?.click()}
+                          title={isRtl ? 'إضافة صورة جديدة' : 'Add another image'}
+                        >
+                          <FaPlus />
+                          <span>{isRtl ? `إضافة (${9 - galleryMedia.length} متبقية)` : `Add (${9 - galleryMedia.length} left)`}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {galleryMedia.length >= 9 && (
+                    <div className="media-limit-banner">
+                      <FaCircleCheck />
+                      <span>{isRtl ? 'تم بلوغ الحد الأقصى لمعرض الصور (9 صور إضافية).' : 'Maximum gallery limit reached (9 images).'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-Section C: Product Videos (Max 2 Videos, Max 60s, 720p HD) */}
+                <div className="media-sub-section">
+                  <div className="sub-section-title-row">
+                    <div className="sub-title">
+                      <FaVideo className="video-icon" />
+                      <span>{isRtl ? 'مقاطع الفيديو الترويجية (Video Reels)' : 'Product Demonstration Videos'}</span>
+                      <span className="counter-pill">{videoMedia.length} / 2 {isRtl ? 'فيديوهات' : 'videos'}</span>
+                    </div>
+
+                    {videoMedia.length < 2 && (
+                      <button
+                        type="button"
+                        className="btn-add-video-trigger"
+                        onClick={() => videoInputRef.current?.click()}
+                        disabled={videoLoading}
+                      >
+                        <FaFilm />
+                        <span>{isRtl ? 'إضافة مقطع فيديو' : 'Add Product Video'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="video-rules-banner">
+                    <div className="rule-item">
+                      <FaClock />
+                      <span>{isRtl ? 'الحد الأقصى للمدة: دقيقة واحدة (60 ثانية)' : 'Max duration: 1 minute (60s)'}</span>
+                    </div>
+                    <div className="rule-item">
+                      <FaCompress />
+                      <span>{isRtl ? 'دقة العرض: 720p HD كحد أقصى (تبقى كما هي لو أقل)' : 'Max resolution: 720p HD (preserved if lower)'}</span>
+                    </div>
+                    <div className="rule-item">
+                      <FaFilm />
+                      <span>{isRtl ? 'العدد المسموح: بحد أقصى مقطعان' : 'Max videos: 2 reels'}</span>
+                    </div>
+                  </div>
+
+                  <input
+                    type="file"
+                    ref={videoInputRef}
+                    accept="video/mp4,video/webm,video/quicktime,video/*"
+                    style={{ display: 'none' }}
+                    onChange={handleVideoSelect}
+                  />
+
+                  {videoMedia.length === 0 ? (
+                    <div
+                      className="video-empty-dropzone"
+                      onClick={() => videoInputRef.current?.click()}
+                    >
+                      <div className="video-drop-icon">
+                        <FaFilm />
+                      </div>
+                      <h4>{isRtl ? 'انقر هنا لإضافة فيديو للمنتج (بحد أقصى 2 فيديو)' : 'Click to upload product video (Max 2)'}</h4>
+                      <p>
+                        {isRtl
+                          ? 'يقوم محرك formatFactory بفحص مدة الفيديو والتأكد من ألا تتجاوز 60 ثانية، مع ضبط الجودة إلى 720p لاستعراض سلس وسريع.'
+                          : 'formatFactory verifies 60s max length and aligns quality to 720p for fast streaming.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="videos-cards-grid">
+                      {videoMedia.map((vid, vIdx) => (
+                        <div key={vid.id || vIdx} className="product-video-card">
+                          <div className="video-player-container">
+                            <video
+                              src={vid.previewUrl || vid.uploadedUrl}
+                              poster={vid.posterUrl}
+                              controls
+                              playsInline
+                              preload="metadata"
+                            />
+                            <div className="video-badge-overlay">
+                              <span className="badge-duration">
+                                <FaClock style={{ fontSize: 10 }} />
+                                {vid.durationFormatted}
+                              </span>
+                              <span className="badge-resolution">{vid.resolutionBadge}</span>
+                            </div>
+                          </div>
+
+                          <div className="video-card-meta">
+                            <div className="meta-text-wrap">
+                              <strong className="video-title">
+                                {isRtl ? `فيديو المنتج #${vIdx + 1}` : `Product Video #${vIdx + 1}`}
+                              </strong>
+                              <span className="video-filename">{vid.originalName}</span>
+                            </div>
+
+                            <div className="video-badges-row">
+                              {vid.uploading ? (
+                                <span className="info-chip highlight" style={{ background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }}>
+                                  {isRtl ? 'جاري الضغط إلى 720p وتقليل الحجم...' : 'Compressing to 720p...'}
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="info-chip">{formatBytes(vid.size)}</span>
+                                  {vid.savingsPercent > 0 && (
+                                    <span className="info-chip" style={{ background: '#dcfce7', color: '#166534', borderColor: '#bbf7d0', fontWeight: '800' }}>
+                                      {isRtl ? `وفر ${vid.savingsPercent}%` : `-${vid.savingsPercent}%`}
+                                    </span>
+                                  )}
+                                  <span className="info-chip highlight">{vid.resolutionBadge || '720p HD'}</span>
+                                </>
+                              )}
+                            </div>
+
+                            <div className="video-card-actions">
+                              <button
+                                type="button"
+                                className="btn-delete-video"
+                                onClick={() => removeVideo(vIdx)}
+                                title={isRtl ? 'حذف الفيديو' : 'Remove video'}
+                              >
+                                <FaTrashCan />
+                                <span>{isRtl ? 'حذف المقطع' : 'Delete Video'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {videoMedia.length < 2 && (
+                        <div
+                          className="video-add-slot-card"
+                          onClick={() => videoInputRef.current?.click()}
+                        >
+                          <FaPlus />
+                          <span>{isRtl ? 'إضافة فيديو ثانٍ (متبقي 1)' : 'Add 2nd Video (1 left)'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {videoMedia.length >= 2 && (
+                    <div className="media-limit-banner">
+                      <FaCircleCheck />
+                      <span>{isRtl ? 'تم بلوغ الحد الأقصى لمقاطع الفيديو للمنتج (مقطعان).' : 'Maximum video limit reached (2 videos).'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ==============================================================
+                  Card 3: CATEGORY HIERARCHY TREE SELECTOR
                  ============================================================== */}
               <div
                 className="form-section-card"
@@ -786,15 +1779,16 @@ export default function AddProductPage() {
                 <div className="section-header">
                   <div className="title-wrap">
                     <div className="section-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <line x1="6" y1="3" x2="6" y2="15"></line>
-                        <circle cx="18" cy="6" r="3"></circle>
-                        <circle cx="6" cy="18" r="3"></circle>
-                        <path d="M18 9a9 9 0 0 1-9 9"></path>
-                      </svg>
+                      <FaFolderTree />
                     </div>
-                    <h2>{isRtl ? 'التصنيف الهرمي والأقسام التابعة' : 'Category Hierarchy & Assignment'}</h2>
-                    <span className="mandatory-tag">{isRtl ? 'إجباري قسم واحد على الأقل' : 'Min 1 Required'}</span>
+                    <div>
+                      <h2>{isRtl ? 'التصنيف الهرمي والأقسام التابعة' : 'Category Hierarchy & Strict Breadcrumbs'}</h2>
+                      <p className="section-subtitle">
+                        {isRtl
+                          ? 'التسلسل المعتمد: القسم الرئيسي ← القسم الفرعي ← المنتج. مع اختيار قسم أساسي واحد.'
+                          : 'Strict hierarchy: Root Category &rarr; Subcategory &rarr; Products.'}
+                      </p>
+                    </div>
                   </div>
                   {selectedCategoryIds.length > 0 && (
                     <button
@@ -816,17 +1810,165 @@ export default function AddProductPage() {
                     <div className="banner-text">
                       {isRtl ? (
                         <>
-                          <strong>الهيكل الهرمي الصارم:</strong> القسم الرئيسي ← القسم الفرعي ← المنتج.
-                          يمكن إضافة المنتج إلى عدة أقسام في نفس الوقت، مع تحديد <strong>القسم الأساسي (Primary)</strong> الذي يقود مسار التنقل وروابط المتجر وتوريث التاجز تلقائياً.
+                          <strong>الهيكل الهرمي:</strong> القسم الرئيسي ← القسم الفرعي ← المنتج.
+                          <strong> لا يمكن إضافة المنتجات في قسم رئيسي بشكل مباشر</strong>؛ اختر القسم الرئيسي أولاً لاستعراض أقسامه الفرعية، ثم حدد الأقسام الفرعية التي ينتمي إليها المنتج، مع اختيار <strong>قسم أساسي واحد</strong> لتوجيه مسار التصفح.
                         </>
                       ) : (
                         <>
                           <strong>Strict Hierarchy:</strong> Root Category &rarr; Subcategory &rarr; Products.
-                          You can assign this product to multiple categories. Choose one <strong>Primary Category</strong> to drive store breadcrumbs and auto-categorization.
+                          <strong> Products cannot be added directly to root categories.</strong> Choose a parent category first, then select subcategories to assign this product.
                         </>
                       )}
                     </div>
                   </div>
+
+                  {/* Step 1: Parent Category Custom Selector */}
+                  <div className="root-category-picker-box">
+                    <label className="picker-step-label">
+                      <span className="step-number">1</span>
+                      <span className="step-title">
+                        {isRtl ? 'اختر القسم الرئيسي (Parent Category)' : 'Select Parent Category'}
+                        <span className="req">*</span>
+                      </span>
+                      <span className="step-desc">
+                        {isRtl
+                          ? 'استعرض الأقسام الرئيسية في الكتالوج لعرض الأقسام الفرعية المندرجة تحتها'
+                          : 'Select a catalog root department to view and pick its subcategories'}
+                      </span>
+                    </label>
+
+                    <div className="selector-wrapper">
+                      <CustomSelect
+                        options={rootCategoryOptions}
+                        value={selectedRootCategoryId}
+                        onChange={(val) => {
+                          setSelectedRootCategoryId(val);
+                          setCategoryValidationError(false);
+                        }}
+                        placeholder={isRtl ? '-- اضغط لاختيار القسم الرئيسي أولاً --' : '-- Choose Parent Category --'}
+                        isRtl={isRtl}
+                        searchable={true}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Step 2: Available Subcategories in the selected Root Category */}
+                  {selectedRootCategoryId && currentRootCategory && (
+                    <div className="subcategories-selection-container">
+                      <div className="subcategories-header-bar">
+                        <div className="header-left">
+                          <span className="step-number">2</span>
+                          <div>
+                            <h4 className="sub-section-title">
+                              {isRtl
+                                ? `الأقسام الفرعية التابعة لقسم: ${currentRootCategory.name_ar}`
+                                : `Subcategories under: ${currentRootCategory.name_en}`}
+                            </h4>
+                            <p className="sub-section-desc">
+                              {isRtl
+                                ? 'حدد قسماً فرعياً واحداً أو أكثر لإدراج المنتج فيه، وحدد القسم الأساسي (Primary)'
+                                : 'Select one or more subcategories for this product and set the primary one'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {availableSubcategories.length > 0 && (
+                          <div className="category-filter-search-mini">
+                            <input
+                              type="text"
+                              placeholder={isRtl ? 'بحث في الأقسام الفرعية...' : 'Filter subcategories...'}
+                              value={categorySearchQuery}
+                              onChange={(e) => setCategorySearchQuery(e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {availableSubcategories.length === 0 ? (
+                        <div className="empty-subcategories-alert">
+                          <FaTriangleExclamation />
+                          <div>
+                            <strong>{isRtl ? 'لا توجد أقسام فرعية داخل هذا القسم الرئيسي!' : 'No subcategories found in this root category!'}</strong>
+                            <p>
+                              {isRtl
+                                ? 'نظراً لأن المنتجات لا يمكن إضافتها في قسم رئيسي مباشرة، يرجى إضافة قسم فرعي أولاً من لوحة تحكم الأقسام أو اختيار قسم رئيسي آخر يحتوي على أقسام فرعية.'
+                                : 'Since products must belong to a subcategory, please add subcategories under this parent or select a different parent.'}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="subcategories-cards-grid">
+                          {availableSubcategories
+                            .filter((sub) => {
+                              if (!categorySearchQuery.trim()) return true;
+                              const q = categorySearchQuery.toLowerCase().trim();
+                              return (
+                                (sub.name_ar && sub.name_ar.toLowerCase().includes(q)) ||
+                                (sub.name_en && sub.name_en.toLowerCase().includes(q)) ||
+                                (sub.slug && sub.slug.toLowerCase().includes(q)) ||
+                                String(sub.id).includes(q)
+                              );
+                            })
+                            .map((sub) => {
+                              const isSubSelected = selectedCategoryIds.includes(sub.id);
+                              const isSubPrimary = String(primaryCategoryId) === String(sub.id);
+
+                              return (
+                                <div
+                                  key={sub.id}
+                                  className={`subcategory-select-card ${isSubSelected ? 'selected' : ''}`}
+                                  onClick={() => toggleCategorySelection(sub.id)}
+                                >
+                                  <div className="card-top-row">
+                                    <div className="checkbox-wrap">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSubSelected}
+                                        onChange={() => { }}
+                                      />
+                                    </div>
+                                    <div className="sub-icon-box">
+                                      <OptionIconRenderer
+                                        iconUrl={sub.icon_url}
+                                        imageUrl={sub.image_url}
+                                        isSubcategory={true}
+                                      />
+                                    </div>
+                                    <div className="sub-text-content">
+                                      <span className="sub-name">{isRtl ? sub.name_ar : sub.name_en}</span>
+                                      <span className="sub-slug">#{sub.slug}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="card-bottom-actions">
+                                    <span className="sub-id-pill">ID: {sub.id}</span>
+                                    {isSubSelected && (
+                                      <button
+                                        type="button"
+                                        className={`btn-set-primary-chip ${isSubPrimary ? 'active' : ''}`}
+                                        onClick={(e) => setAsPrimaryCategory(sub.id, e)}
+                                      >
+                                        {isSubPrimary ? (
+                                          <>
+                                            <FaStar />
+                                            <span>{isRtl ? 'القسم الأساسي' : 'Primary'}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <FaRegStar />
+                                            <span>{isRtl ? 'جعله أساسي' : 'Set Primary'}</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Live Storefront Breadcrumb Preview */}
                   {activeBreadcrumbTrail && (
@@ -854,190 +1996,28 @@ export default function AddProductPage() {
                     </div>
                   )}
 
-                  {/* Category Search Filter */}
-                  <div className="category-filter-search">
-                    <input
-                      type="text"
-                      placeholder={isRtl ? 'ابحث عن قسم رئيسي أو فرعي بالاسم أو المعرف (ID)...' : 'Search categories by name or ID...'}
-                      value={categorySearchQuery}
-                      onChange={(e) => setCategorySearchQuery(e.target.value)}
-                    />
-                    <div className="search-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                      </svg>
-                    </div>
-                  </div>
-
-                  {/* Hierarchy Tree Visual Box */}
-                  <div className="categories-tree-box">
-                    {loadingPrereqs ? (
-                      <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
-                        {isRtl ? 'جارٍ تحميل شجرة الأقسام...' : 'Loading categories tree...'}
-                      </div>
-                    ) : prereqError ? (
-                      <div style={{ padding: '24px', textAlign: 'center', color: '#ef4444', fontSize: '13px' }}>
-                        <p style={{ marginBottom: '10px', fontWeight: 600 }}>{prereqError}</p>
-                        <button
-                          type="button"
-                          onClick={fetchPrerequisites}
-                          style={{
-                            padding: '6px 16px',
-                            borderRadius: '8px',
-                            background: '#0057C2',
-                            color: '#fff',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '12.5px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {isRtl ? 'إعادة المحاولة' : 'Retry'}
-                        </button>
-                      </div>
-                    ) : filteredTree.length === 0 ? (
-                      <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                        {isRtl ? 'لا توجد أقسام مطابقة للبحث' : 'No matching categories found'}
-                      </div>
-                    ) : (
-                      filteredTree.map((root) => {
-                        const isRootSelected = selectedCategoryIds.includes(root.id);
-                        const isRootPrimary = String(primaryCategoryId) === String(root.id);
-
-                        return (
-                          <div key={root.id} className="tree-node-group">
-                            {/* Root Category Row */}
-                            <div
-                              className={`root-category-row ${isRootSelected ? 'selected-root' : ''}`}
-                              onClick={() => toggleCategorySelection(root.id)}
-                            >
-                              <div className="row-left">
-                                <input
-                                  type="checkbox"
-                                  checked={isRootSelected}
-                                  onChange={() => { }} // handled by parent onClick
-                                />
-                                <div className="category-icon-box" style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <OptionIconRenderer
-                                    iconUrl={root.icon_url}
-                                    imageUrl={root.image_url}
-                                    isSubcategory={false}
-                                  />
-                                </div>
-                                <span className="category-title">
-                                  {isRtl ? root.name_ar : root.name_en}
-                                </span>
-                                <span className="id-badge">ID: {root.id}</span>
-                              </div>
-
-                              <div className="row-right">
-                                {isRootSelected && (
-                                  <button
-                                    type="button"
-                                    className={`btn-mark-primary ${isRootPrimary ? 'is-primary' : ''}`}
-                                    onClick={(e) => setAsPrimaryCategory(root.id, e)}
-                                    title={isRtl ? 'تعيين كقسم رئيسي للمنتج' : 'Set as primary category'}
-                                  >
-                                    {isRootPrimary ? (
-                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                        <FaStar style={{ fontSize: 11 }} /> {isRtl ? 'القسم الأساسي' : 'Primary'}
-                                      </span>
-                                    ) : (
-                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                        <FaRegStar style={{ fontSize: 11 }} /> {isRtl ? 'جعله أساسي' : 'Make Primary'}
-                                      </span>
-                                    )}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Subcategories Nested List */}
-                            {root.subcategories && root.subcategories.length > 0 && (
-                              <div className="subcategories-list">
-                                {root.subcategories.map((sub) => {
-                                  const isSubSelected = selectedCategoryIds.includes(sub.id);
-                                  const isSubPrimary = String(primaryCategoryId) === String(sub.id);
-
-                                  return (
-                                    <div
-                                      key={sub.id}
-                                      className={`subcategory-row ${isSubSelected ? 'selected-sub' : ''}`}
-                                      onClick={() => toggleCategorySelection(sub.id)}
-                                    >
-                                      <div className="sub-left">
-                                        <input
-                                          type="checkbox"
-                                          checked={isSubSelected}
-                                          onChange={() => { }} // handled by parent onClick
-                                        />
-                                        <div className="sub-icon-box" style={{ width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                          <OptionIconRenderer
-                                            iconUrl={sub.icon_url}
-                                            imageUrl={sub.image_url}
-                                            isSubcategory={true}
-                                          />
-                                        </div>
-                                        <span className="sub-title">
-                                          {isRtl ? sub.name_ar : sub.name_en}
-                                        </span>
-                                        <span className="sub-id-badge">ID: {sub.id}</span>
-                                      </div>
-
-                                      <div className="sub-right">
-                                        {isSubSelected && (
-                                          <button
-                                            type="button"
-                                            className={`btn-mark-primary ${isSubPrimary ? 'is-primary' : ''}`}
-                                            onClick={(e) => setAsPrimaryCategory(sub.id, e)}
-                                            title={isRtl ? 'تعيين كقسم رئيسي للمنتج' : 'Set as primary category'}
-                                          >
-                                            {isSubPrimary ? (
-                                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                                <FaStar style={{ fontSize: 10 }} /> {isRtl ? 'القسم الأساسي' : 'Primary'}
-                                              </span>
-                                            ) : (
-                                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                                <FaRegStar style={{ fontSize: 10 }} /> {isRtl ? 'جعله أساسي' : 'Make Primary'}
-                                              </span>
-                                            )}
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
                   {/* Summary Bar */}
                   <div className="selected-summary-bar">
-                    <div>
-                      <span>{isRtl ? 'الأقسام المحددة: ' : 'Selected Categories: '}</span>
+                    <div className="summary-info">
+                      <span>{isRtl ? 'الأقسام الفرعية المحددة: ' : 'Selected Subcategories: '}</span>
                       <strong className="badge-count">{selectedCategoryIds.length}</strong>
                       {primaryCategoryId && (
-                        <span style={{ marginInlineStart: '10px', color: '#0f172a' }}>
-                          ({isRtl ? 'الأساسي: ' : 'Primary: '} <code>{primaryCategoryId}</code>)
+                        <span className="primary-notice">
+                          ({isRtl ? 'الفرعي الأساسي: ' : 'Primary Subcategory: '} <strong>{flatCategories.find((c) => String(c.id) === String(primaryCategoryId))?.name_ar || primaryCategoryId}</strong>)
                         </span>
                       )}
                     </div>
                     {categoryValidationError && (
-                      <span style={{ color: '#ef4444', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ color: '#ef4444', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <FaCircleXmark />
-                        <span>{isRtl ? 'مطلوب تحديد قسم واحد على الأقل' : 'At least 1 category required'}</span>
+                        <span>{isRtl ? 'يجب اختيار قسم فرعي واحد على الأقل للمنتج' : 'At least 1 subcategory must be selected'}</span>
                       </span>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Card 3: Pricing & Profitability Dashboard */}
+              {/* Card 4: Pricing & Profitability Dashboard */}
               <div className="form-section-card">
                 <div className="section-header">
                   <div className="title-wrap">
@@ -1047,15 +2027,22 @@ export default function AddProductPage() {
                         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                       </svg>
                     </div>
-                    <h2>{isRtl ? 'التسعير وتحليلات الأرباح' : 'Pricing & Profit Analytics'}</h2>
-                    <span className="mandatory-tag">{isRtl ? 'إجباري السعر' : 'Price Required'}</span>
+                    <div>
+                      <h2>{isRtl ? 'التسعير وتحليلات هوامش الربحية' : 'Pricing & Profit Analytics'}</h2>
+                      <p className="section-subtitle">
+                        {isRtl
+                          ? 'تحديد سعر التكلفة، السعر الأصلي، وسعر العرض مع احتساب صافي الربح وهامش المارجن لحظياً.'
+                          : 'Configure COGS, retail, and sale prices with real-time margin calculations.'}
+                      </p>
+                    </div>
                   </div>
+                  <span className="mandatory-tag">{isRtl ? 'السعر إجباري' : 'Price Required'}</span>
                 </div>
 
-                <div className="form-group-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div className="form-group-grid pricing-grid-row">
                   <div className="form-group">
                     <label>
-                      <span>{isRtl ? 'سعر التكلفة (ج.م)' : 'Cost Price (EGP)'}</span>
+                      <span>{isRtl ? 'سعر التكلفة (ج.م)' : 'Cost Price / COGS (EGP)'}</span>
                       <span className="label-hint">{isRtl ? 'لحساب الأرباح' : 'For Margin'}</span>
                     </label>
                     <input
@@ -1070,7 +2057,7 @@ export default function AddProductPage() {
 
                   <div className="form-group">
                     <label>
-                      <span>{isRtl ? 'السعر الأصلي (ج.م)' : 'Original Price (EGP)'}</span>
+                      <span>{isRtl ? 'سعر البيع الأصلي (ج.م)' : 'Retail Price (EGP)'}</span>
                       <span className="req">*</span>
                     </label>
                     <input
@@ -1086,7 +2073,7 @@ export default function AddProductPage() {
 
                   <div className="form-group">
                     <label>
-                      <span>{isRtl ? 'سعر الخصم / العرض (ج.م)' : 'Sale Price (EGP)'}</span>
+                      <span>{isRtl ? 'سعر العرض / التخفيض (ج.م)' : 'Sale Price (EGP)'}</span>
                       <span className="label-hint">{isRtl ? 'اختياري' : 'Optional'}</span>
                     </label>
                     <input
@@ -1098,34 +2085,94 @@ export default function AddProductPage() {
                       onChange={(e) => setSalePrice(e.target.value)}
                     />
                   </div>
+
+                  <div className="form-group discount-expiration-group">
+                    <label>
+                      <span className="label-with-icon">
+                        <FaClock style={{ fontSize: 12, color: 'var(--main-color, #0057C2)' }} />
+                        <span>{isRtl ? 'مدة انتهاء الخصم' : 'Discount Expiry'}</span>
+                      </span>
+                      {saleEndsAt && (
+                        <button
+                          type="button"
+                          className="btn-clear-date"
+                          onClick={() => setSaleEndsAt('')}
+                          title={isRtl ? 'إلغاء الموعد' : 'Clear expiration date'}
+                        >
+                          <FaXmark style={{ fontSize: 10 }} />
+                          <span>{isRtl ? 'إلغاء' : 'Clear'}</span>
+                        </button>
+                      )}
+                    </label>
+                    <div className="date-input-container">
+                      <input
+                        type="datetime-local"
+                        className="custom-date-picker-input"
+                        value={saleEndsAt}
+                        min={currentMinDate || undefined}
+                        onChange={(e) => setSaleEndsAt(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Quick Presets for Discount Expiry */}
+                {salePrice && parseFloat(originalPrice) > parseFloat(salePrice) && (
+                  <div className="discount-presets-bar">
+                    <span className="presets-label">{isRtl ? 'تحديد سريع لانتهاء العرض:' : 'Quick Presets:'}</span>
+                    <div className="presets-chips">
+                      <button type="button" className="preset-chip" onClick={() => setSaleEndPreset(3)}>
+                        +3 {isRtl ? 'أيام' : 'Days'}
+                      </button>
+                      <button type="button" className="preset-chip" onClick={() => setSaleEndPreset(7)}>
+                        +1 {isRtl ? 'أسبوع' : 'Week'}
+                      </button>
+                      <button type="button" className="preset-chip" onClick={() => setSaleEndPreset(14)}>
+                        +2 {isRtl ? 'أسبوعين' : 'Weeks'}
+                      </button>
+                      <button type="button" className="preset-chip" onClick={() => setSaleEndPreset(30)}>
+                        +1 {isRtl ? 'شهر' : 'Month'}
+                      </button>
+                      <button type="button" className="preset-chip" onClick={setSaleEndMonth}>
+                        {isRtl ? 'نهاية الشهر الحالي' : 'End of Month'}
+                      </button>
+                    </div>
+
+                    {saleRemainingText && (
+                      <div className={`countdown-status-pill ${saleRemainingText.expired ? 'expired' : 'active'}`}>
+                        <FaClock />
+                        <span>{saleRemainingText.text}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Live Profitability Dashboard Box */}
                 <div className="profitability-dashboard-box">
                   <div className="metric-card">
-                    <span className="metric-label">{isRtl ? 'صافي الربح المتوقع' : 'Estimated Profit'}</span>
+                    <span className="metric-label">{isRtl ? 'صافي الربح المتوقع للوحدة' : 'Unit Net Profit'}</span>
                     <span className="metric-val profit-val">
                       {metrics.netProfit} <small style={{ fontSize: '11px' }}>{isRtl ? 'ج.م' : 'EGP'}</small>
                     </span>
                   </div>
 
                   <div className="metric-card">
-                    <span className="metric-label">{isRtl ? 'هامش الربح (Margin)' : 'Profit Margin'}</span>
+                    <span className="metric-label">{isRtl ? 'هامش الربح التجاري (Gross Margin)' : 'Gross Margin'}</span>
                     <span className="metric-val profit-val">
                       {metrics.margin}%
                     </span>
                   </div>
 
                   <div className="metric-card">
-                    <span className="metric-label">{isRtl ? 'نسبة التخفيض' : 'Discount Rate'}</span>
+                    <span className="metric-label">{isRtl ? 'نسبة الخصم الفعلي' : 'Discount Rate'}</span>
                     <span className={`metric-val ${metrics.discount > 0 ? 'discount-val' : ''}`}>
-                      {metrics.discount > 0 ? `${metrics.discount}%` : (isRtl ? 'بدون خصم' : 'No discount')}
+                      {metrics.discount > 0 ? `${metrics.discount}%` : (isRtl ? 'بدون خصم' : 'None')}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Card 4: Inventory & Codes */}
+              {/* Card 5: Inventory & Codes */}
               <div className="form-section-card">
                 <div className="section-header">
                   <div className="title-wrap">
@@ -1136,13 +2183,18 @@ export default function AddProductPage() {
                         <line x1="12" y1="22.08" x2="12" y2="12"></line>
                       </svg>
                     </div>
-                    <h2>{isRtl ? 'المخزون والأكواد ومستوى التنبيه' : 'Inventory & Tracking'}</h2>
+                    <div>
+                      <h2>{isRtl ? 'المخزون والأكواد ومستوى التنبيه' : 'Inventory Tracking & Warehouse Barcodes'}</h2>
+                      <p className="section-subtitle">
+                        {isRtl ? 'إدارة أكواد الـ SKU والباركود والتحكم بكميات المستودعات الفعلية.' : 'SKU generation, barcode tagging, and stock safety triggers.'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 <div className="form-group-grid">
                   <div className="form-group">
-                    <label>{isRtl ? 'رمز SKU المميز' : 'SKU Code'}</label>
+                    <label>{isRtl ? 'رمز SKU التعريفي' : 'SKU Identifier'}</label>
                     <div className="input-with-button-wrap">
                       <input
                         type="text"
@@ -1157,7 +2209,7 @@ export default function AddProductPage() {
                   </div>
 
                   <div className="form-group">
-                    <label>{isRtl ? 'الباركود الدولي (EAN / Barcode)' : 'Barcode'}</label>
+                    <label>{isRtl ? 'الباركود الدولي (EAN-13)' : 'International Barcode'}</label>
                     <div className="input-with-button-wrap">
                       <input
                         type="text"
@@ -1175,7 +2227,7 @@ export default function AddProductPage() {
                 <div className="form-group-grid">
                   <div className="form-group">
                     <label>
-                      <span>{isRtl ? 'الكمية المتوفرة بالمخزن' : 'Stock Quantity'}</span>
+                      <span>{isRtl ? 'الكمية المتوفرة بالمستودع' : 'Stock Quantity'}</span>
                       <span className="req">*</span>
                     </label>
                     <input
@@ -1189,8 +2241,8 @@ export default function AddProductPage() {
 
                   <div className="form-group">
                     <label>
-                      <span>{isRtl ? 'حد تنبيه انخفاض المخزون' : 'Low Stock Alert Threshold'}</span>
-                      <span className="label-hint">{isRtl ? 'ينبهك النظام عند الوصول له' : 'Alert Trigger'}</span>
+                      <span>{isRtl ? 'حد تنبيه انخفاض المخزون' : 'Low Stock Threshold'}</span>
+                      <span className="label-hint">{isRtl ? 'إشعار فوري عند الوصول' : 'ERP Trigger'}</span>
                     </label>
                     <input
                       type="number"
@@ -1202,7 +2254,7 @@ export default function AddProductPage() {
                 </div>
               </div>
 
-              {/* Card 5: Technical Specifications Repeater */}
+              {/* Card 6: Technical Specifications Repeater */}
               <div className="form-section-card">
                 <div className="section-header">
                   <div className="title-wrap">
@@ -1220,7 +2272,12 @@ export default function AddProductPage() {
                         <line x1="1" y1="14" x2="4" y2="14"></line>
                       </svg>
                     </div>
-                    <h2>{isRtl ? 'المواصفات الفنية والتقنية (Key-Value)' : 'Technical Specifications'}</h2>
+                    <div>
+                      <h2>{isRtl ? 'المواصفات الفنية والسمات التقنية' : 'Technical Specifications (Key-Value)'}</h2>
+                      <p className="section-subtitle">
+                        {isRtl ? 'جدول المواصفات التفصيلية الذي يظهر في صفحة عرض المنتج للعميل.' : 'Detailed attribute table rendered on storefront product specifications tab.'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -1229,13 +2286,13 @@ export default function AddProductPage() {
                     <div key={idx} className="spec-row">
                       <input
                         type="text"
-                        placeholder={isRtl ? 'اسم الخاصية (مثال: المعالج / الرام)' : 'Property (e.g. RAM / Processor)'}
+                        placeholder={isRtl ? 'اسم الخاصية (مثال: المعالج / الرام / المنافذ)' : 'Property (e.g. Ports / Processor)'}
                         value={spec.key}
                         onChange={(e) => handleSpecChange(idx, 'key', e.target.value)}
                       />
                       <input
                         type="text"
-                        placeholder={isRtl ? 'القيمة (مثال: 16GB DDR5 / Core i7)' : 'Value (e.g. 16GB / Core i7)'}
+                        placeholder={isRtl ? 'القيمة (مثال: 24 Gigabit Ports / 16GB DDR5)' : 'Value (e.g. 24 Gigabit Ports)'}
                         value={spec.value}
                         onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
                       />
@@ -1251,180 +2308,277 @@ export default function AddProductPage() {
                   ))}
 
                   <button type="button" className="btn-add-spec-row" onClick={addSpecRow}>
-                    <span>+ {isRtl ? 'إضافة مواصفة فنية جديدة' : 'Add New Specification'}</span>
+                    <span>+ {isRtl ? 'إضافة مواصفة فنية جديدة' : 'Add Specification'}</span>
                   </button>
                 </div>
               </div>
             </div>
 
             {/* ==============================================================
-                SIDE COLUMN (Media, Brand, Tags, Visibility)
+                SIDE COLUMN (Live Preview, Brand, Tags, Visibility)
                ============================================================== */}
             <div className="form-side-column">
-              {/* Card 6: Product Images & Media Gallery */}
-              <div className="form-section-card">
+              {/* Card 7: Live Storefront Card Preview */}
+              <div className="form-section-card storefront-preview-card">
                 <div className="section-header">
                   <div className="title-wrap">
                     <div className="section-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                      </svg>
+                      <FaEye />
                     </div>
-                    <h2>{isRtl ? 'صور المنتج والمعرض' : 'Images & Media'}</h2>
+                    <div>
+                      <h2>{isRtl ? 'معاينة بطاقة المنتج الحية' : 'Storefront Live Preview'}</h2>
+                      <p className="section-subtitle">{isRtl ? 'الشكل الظاهر للعملاء في المتجر' : 'Live consumer card representation'}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="media-upload-area">
-                  {/* Primary Cover Image Preview */}
-                  <div className="cover-image-preview-box">
-                    {coverImageUrl ? (
+                <div className="storefront-card-mockup">
+                  <div className="card-mockup-image">
+                    {coverMedia?.previewUrl || coverMedia?.uploadedUrl ? (
                       <img
-                        src={coverImageUrl}
-                        alt="Product Preview"
+                        src={coverMedia.previewUrl || coverMedia.uploadedUrl}
+                        alt="Product Card Preview"
                         onError={(e) => {
                           e.target.src = '/icons/fallback-product.svg';
                         }}
                       />
                     ) : (
-                      <div className="empty-placeholder">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                          <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                        <span>{isRtl ? 'معاينة الصورة الرئيسية' : 'Cover Image Preview'}</span>
+                      <div className="mockup-empty-img">
+                        <FaImage />
+                        <span>{isRtl ? 'في انتظار غلاف المنتج...' : 'Awaiting Cover...'}</span>
                       </div>
+                    )}
+                    {metrics.discount > 0 && (
+                      <span className="discount-pill">خصم {metrics.discount}%</span>
+                    )}
+                    {isFeatured && (
+                      <span className="featured-pill"><FaStar /> {isRtl ? 'مميز' : 'Featured'}</span>
                     )}
                   </div>
 
-                  <div className="form-group">
-                    <label>
-                      <span>{isRtl ? 'رابط الصورة الرئيسية (Cover)' : 'Primary Image URL'}</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="https://.../product.jpg"
-                      value={coverImageUrl}
-                      onChange={(e) => setCoverImageUrl(e.target.value)}
-                    />
-                  </div>
+                  <div className="card-mockup-body">
+                    {activeBreadcrumbTrail?.rootName && (
+                      <span className="mockup-category-crumb">
+                        {activeBreadcrumbTrail.rootName}
+                        {activeBreadcrumbTrail.subName ? ` / ${activeBreadcrumbTrail.subName}` : ''}
+                      </span>
+                    )}
+                    <h4 className="mockup-product-name">
+                      {nameAr || nameEn || (isRtl ? 'اسم المنتج النموذجي' : 'Product Title Preview')}
+                    </h4>
 
-                  {/* Additional Gallery Images */}
-                  <div className="additional-images-list">
-                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569' }}>
-                      {isRtl ? 'صور إضافية لمعرض المنتج:' : 'Additional Gallery Images:'}
-                    </label>
+                    <div className="mockup-pricing-row">
+                      <span className="current-price">
+                        {metrics.effectivePrice > 0 ? metrics.effectivePrice : '0.00'} <small>ج.م</small>
+                      </span>
+                      {salePrice && parseFloat(originalPrice) > parseFloat(salePrice) && (
+                        <span className="original-price">{originalPrice} ج.م</span>
+                      )}
+                    </div>
 
-                    {galleryImages.map((imgUrl, gIdx) => (
-                      <div key={gIdx} className="gallery-item-row">
-                        <input
-                          type="text"
-                          placeholder={`https://.../gallery-${gIdx + 1}.jpg`}
-                          value={imgUrl}
-                          onChange={(e) => handleGalleryChange(gIdx, e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="btn-delete-img"
-                          onClick={() => removeGalleryRow(gIdx)}
-                          title={isRtl ? 'حذف' : 'Remove'}
-                        >
-                          <FaXmark />
-                        </button>
+                    {saleRemainingText && !saleRemainingText.expired && (
+                      <div className="mockup-countdown-pill">
+                        <FaClock style={{ fontSize: 10 }} />
+                        <span>{saleRemainingText.text}</span>
                       </div>
-                    ))}
-
-                    <button
-                      type="button"
-                      style={{
-                        height: '34px',
-                        borderRadius: '8px',
-                        border: '1px dashed #cbd5e1',
-                        background: 'transparent',
-                        color: 'var(--main-color, #0057C2)',
-                        fontSize: '12px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        marginTop: '4px',
-                      }}
-                      onClick={addGalleryRow}
-                    >
-                      + {isRtl ? 'إضافة صورة إضافية' : 'Add Gallery Image'}
-                    </button>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Card 7: Brand Selection */}
+              {/* Card 8: Brand Selection & Quick Add */}
               <div className="form-section-card">
                 <div className="section-header">
                   <div className="title-wrap">
                     <div className="section-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                      </svg>
+                      <FaTag />
                     </div>
-                    <h2>{isRtl ? 'العلامة التجارية (Brand)' : 'Brand'}</h2>
+                    <div>
+                      <h2>{isRtl ? 'العلامة التجارية والمُصنّع' : 'Brand & Manufacturer'}</h2>
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    className="btn-quick-add-trigger"
+                    onClick={() => setShowQuickAddBrand(!showQuickAddBrand)}
+                  >
+                    <FaPlus size={11} />
+                    <span>{showQuickAddBrand ? (isRtl ? 'إغلاق' : 'Close') : (isRtl ? 'إضافة براند سريع +' : 'Quick Add Brand +')}</span>
+                  </button>
                 </div>
 
-                <div className="form-group">
+                {/* Inline Quick Add Brand Box (Arabic & English name only) */}
+                {showQuickAddBrand && (
+                  <div className="quick-add-inline-box">
+                    <div className="quick-add-header">
+                      <FaCopyright />
+                      <span>{isRtl ? 'إضافة سريعة للبراند (اسم عربي وإنجليزي فقط):' : 'Quick Add Brand (Name only):'}</span>
+                    </div>
+
+                    <div className="quick-add-fields-grid">
+                      <div className="field-item">
+                        <label>{isRtl ? 'اسم البراند بالعربية *' : 'Brand Name (Arabic) *'}</label>
+                        <input
+                          type="text"
+                          placeholder={isRtl ? 'مثال: أسوس، سامسونج' : 'e.g. ASUS, Samsung'}
+                          value={quickBrandNameAr}
+                          onChange={(e) => setQuickBrandNameAr(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="field-item">
+                        <label>{isRtl ? 'اسم البراند بالإنجليزية *' : 'Brand Name (English) *'}</label>
+                        <input
+                          type="text"
+                          placeholder={isRtl ? 'مثال: ASUS, Samsung' : 'e.g. ASUS, Samsung'}
+                          value={quickBrandNameEn}
+                          onChange={(e) => setQuickBrandNameEn(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="quick-add-actions">
+                      <button
+                        type="button"
+                        className="btn-quick-cancel"
+                        onClick={() => {
+                          setShowQuickAddBrand(false);
+                          setQuickBrandNameAr('');
+                          setQuickBrandNameEn('');
+                        }}
+                      >
+                        {isRtl ? 'إلغاء' : 'Cancel'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-quick-submit"
+                        disabled={quickBrandLoading}
+                        onClick={handleQuickAddBrand}
+                      >
+                        <FaCheck />
+                        <span>{quickBrandLoading ? (isRtl ? 'جاري الإضافة...' : 'Adding...') : (isRtl ? 'حفظ واختيار البراند' : 'Save & Select')}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginTop: '12px' }}>
                   <CustomSelect
                     value={selectedBrandId}
                     onChange={(val) => setSelectedBrandId(val)}
                     options={brandOptions}
                     searchable={true}
-                    searchPlaceholder={isRtl ? 'ابحث عن ماركة تجارية...' : 'Search brands...'}
+                    searchPlaceholder={isRtl ? 'ابحث عن علامة تجارية...' : 'Search brands...'}
                     placeholder={isRtl ? 'اختر العلامة التجارية...' : 'Select Brand...'}
                     isRtl={isRtl}
                   />
                 </div>
               </div>
 
-              {/* Card 8: Tags Checklist */}
+              {/* Card 9: Tags Checklist & Quick Add */}
               <div className="form-section-card">
                 <div className="section-header">
                   <div className="title-wrap">
                     <div className="section-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
-                      </svg>
+                      <FaTags />
                     </div>
-                    <h2>{isRtl ? 'الوسوم وعلاقات الذكاء' : 'Tags & Rules'}</h2>
+                    <div>
+                      <h2>{isRtl ? 'وسوم الربط وعلاقات الذكاء' : 'Smart Tags & Rules'}</h2>
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    className="btn-quick-add-trigger"
+                    onClick={() => setShowQuickAddTag(!showQuickAddTag)}
+                  >
+                    <FaPlus size={11} />
+                    <span>{showQuickAddTag ? (isRtl ? 'إغلاق' : 'Close') : (isRtl ? 'إضافة وسم سريع +' : 'Quick Add Tag +')}</span>
+                  </button>
                 </div>
 
-                <div className="tags-checklist-box">
+                {/* Inline Quick Add Tag Box (Arabic & English name) */}
+                {showQuickAddTag && (
+                  <div className="quick-add-inline-box">
+                    <div className="quick-add-header">
+                      <FaTags />
+                      <span>{isRtl ? 'إضافة سريعة لوسم جديد (عربي وإنجليزي):' : 'Quick Add New Tag (Arabic & English):'}</span>
+                    </div>
+
+                    <div className="quick-add-fields-grid">
+                      <div className="field-item">
+                        <label>{isRtl ? 'اسم الوسم بالعربية *' : 'Tag Name (Arabic) *'}</label>
+                        <input
+                          type="text"
+                          placeholder={isRtl ? 'مثال: ألعاب احترافية، شحن سريع' : 'e.g. Gaming, Fast Charging'}
+                          value={quickTagNameAr}
+                          onChange={(e) => setQuickTagNameAr(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="field-item">
+                        <label>{isRtl ? 'اسم الوسم بالإنجليزية *' : 'Tag Name (English) *'}</label>
+                        <input
+                          type="text"
+                          placeholder={isRtl ? 'مثال: Pro Gaming, Fast Charge' : 'e.g. Pro Gaming, Fast Charge'}
+                          value={quickTagNameEn}
+                          onChange={(e) => setQuickTagNameEn(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="quick-add-actions">
+                      <button
+                        type="button"
+                        className="btn-quick-cancel"
+                        onClick={() => {
+                          setShowQuickAddTag(false);
+                          setQuickTagNameAr('');
+                          setQuickTagNameEn('');
+                        }}
+                      >
+                        {isRtl ? 'إلغاء' : 'Cancel'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-quick-submit"
+                        disabled={quickTagLoading}
+                        onClick={handleQuickAddTag}
+                      >
+                        <FaCheck />
+                        <span>{quickTagLoading ? (isRtl ? 'جاري الإضافة...' : 'Adding...') : (isRtl ? 'حفظ وتحديد الوسم' : 'Save & Select')}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="tags-checklist-box" style={{ marginTop: '12px' }}>
                   {availableTags.length === 0 ? (
                     <div style={{ padding: '8px', color: '#94a3b8', fontSize: '12px' }}>
-                      {isRtl ? 'لا توجد وسوم مضافة حالياً' : 'No tags found'}
+                      {isRtl ? 'لا توجد وسوم مضافة حالياً. استخدم الإضافة السريعة أعلاه!' : 'No tags found. Use quick add above!'}
                     </div>
                   ) : (
                     availableTags.map((tag) => {
-                      const isTagSelected = selectedTagIds.includes(tag.id);
+                      const isTagSelected = selectedTagIds.map(String).includes(String(tag.id));
                       return (
-                        <label
+                        <button
                           key={tag.id}
+                          type="button"
                           className={`tag-checkbox-pill ${isTagSelected ? 'selected' : ''}`}
                           onClick={() => toggleTagPill(tag.id)}
                         >
-                          <input
-                            type="checkbox"
-                            checked={isTagSelected}
-                            onChange={() => { }}
-                          />
                           <span>#{isRtl ? tag.name_ar : tag.name_en}</span>
-                        </label>
+                        </button>
                       );
                     })
                   )}
                 </div>
               </div>
 
-              {/* Card 9: Visibility & Status */}
+              {/* Card 10: Visibility & Status */}
               <div className="form-section-card">
                 <div className="section-header">
                   <div className="title-wrap">
@@ -1434,15 +2588,17 @@ export default function AddProductPage() {
                         <circle cx="12" cy="12" r="3"></circle>
                       </svg>
                     </div>
-                    <h2>{isRtl ? 'حالة النشر والظهور' : 'Visibility & Status'}</h2>
+                    <div>
+                      <h2>{isRtl ? 'حالة النشر والظهور' : 'Visibility & Store Status'}</h2>
+                    </div>
                   </div>
                 </div>
 
                 <div className="switches-vertical-list">
                   <div className="switch-row">
                     <div className="switch-text">
-                      <strong>{isRtl ? 'نشط في المتجر' : 'Active in Store'}</strong>
-                      <small>{isRtl ? 'متاح للعملاء للطلب والشراء' : 'Visible and purchasable by clients'}</small>
+                      <strong>{isRtl ? 'نشط في واجهة المتجر' : 'Active in Store'}</strong>
+                      <small>{isRtl ? 'متاح للعملاء للطلب والشراء الفوري' : 'Visible and purchasable by clients'}</small>
                     </div>
                     <input
                       type="checkbox"
@@ -1453,8 +2609,8 @@ export default function AddProductPage() {
 
                   <div className="switch-row">
                     <div className="switch-text">
-                      <strong>{isRtl ? 'منتج مميز (Featured)' : 'Featured Product'}</strong>
-                      <small>{isRtl ? 'يظهر في بانرات المتجر والواجهة الرئيسية' : 'Spotlighted on homepage'}</small>
+                      <strong>{isRtl ? 'منتج مميز (Featured Spotlight)' : 'Featured Spotlight'}</strong>
+                      <small>{isRtl ? 'يظهر في واجهة المتجر والبانرات الترويجية' : 'Highlighted on homepage carousel'}</small>
                     </div>
                     <input
                       type="checkbox"
@@ -1473,14 +2629,14 @@ export default function AddProductPage() {
               {isFormValid ? (
                 <div className="validation-ok">
                   <FaCheck style={{ fontSize: 13 }} />
-                  <span>{isRtl ? 'جميع المتطلبات الأساسية مكتملة وجاهزة للنشر' : 'All required fields are completed'}</span>
+                  <span>{isRtl ? 'جميع المتطلبات الأساسية مكتملة وجاهزة للنشر الفوري' : 'All required fields are completed'}</span>
                 </div>
               ) : (
                 <div className="validation-alert">
                   <FaTriangleExclamation style={{ fontSize: 13 }} />
                   <span>
                     {isRtl
-                      ? 'مطلوب: الاسم، السعر، وقسم واحد على الأقل'
+                      ? 'مطلوب: الاسم باللغتين، سعر البيع، وتحديد قسم واحد على الأقل'
                       : 'Required: Name, Price, and at least 1 Category'}
                   </span>
                 </div>
@@ -1490,12 +2646,7 @@ export default function AddProductPage() {
             <div className="bottom-actions">
               <button
                 type="button"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: '#ffffff',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '0 18px',
-                }}
+                className="btn-bottom-draft"
                 onClick={() => handleSubmit(false)}
                 disabled={submitting}
               >
@@ -1511,7 +2662,7 @@ export default function AddProductPage() {
                 {submitting ? (
                   <span>{isRtl ? 'جارٍ النشر...' : 'Publishing...'}</span>
                 ) : (
-                  <span>{isRtl ? 'حفظ ونشر المنتج' : 'Publish Product'}</span>
+                  <span>{isRtl ? 'حفظ ونشر المنتج في المتجر' : 'Publish Product'}</span>
                 )}
               </button>
             </div>

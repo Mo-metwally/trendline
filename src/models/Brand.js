@@ -24,6 +24,18 @@ const Brand = sequelize.define('Brand', {
     type: DataTypes.STRING(500),
     allowNull: false,
   },
+  description_ar: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  description_en: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  website_url: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
   is_featured: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,

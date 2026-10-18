@@ -1,0 +1,130 @@
+.trendline-quill-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-family: var(--font-cairo), 'Cairo', sans-serif;
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1.5px solid #e2e8f0;
+  transition: all 0.2s ease;
+
+  &:focus-within {
+    border-color: var(--main-color, #0057C2);
+    box-shadow: 0 0 0 3px rgba(0, 87, 194, 0.1);
+  }
+
+  // Toolbar
+  .ql-toolbar.ql-snow {
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+    background: #f8fafc;
+    padding: 8px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+
+    .ql-formats {
+      margin-right: 8px;
+      margin-bottom: 2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    button,
+    .ql-picker {
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+
+      &:hover {
+        background: #e2e8f0;
+      }
+    }
+
+    .ql-picker-label {
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 700;
+    }
+  }
+
+  // Editor Area
+  .ql-container.ql-snow {
+    border: none;
+    font-family: inherit;
+    font-size: 13.5px;
+    min-height: var(--editor-min-height, 180px);
+    display: flex;
+    flex-direction: column;
+
+    .ql-editor {
+      flex: 1;
+      min-height: var(--editor-min-height, 180px);
+      padding: 14px 16px;
+      color: #0f172a;
+      line-height: 1.7;
+
+      &.ql-blank::before {
+        font-style: normal;
+        color: #94a3b8;
+        font-weight: 500;
+      }
+
+      p, ul, ol, h1, h2, h3, h4 {
+        margin-bottom: 8px;
+      }
+
+      h1, h2, h3, h4 {
+        font-weight: 800;
+        color: #0f172a;
+      }
+
+      ul, ol {
+        padding-inline-start: 22px;
+      }
+    }
+  }
+
+  // RTL Variant
+  &.dir-rtl {
+    direction: rtl;
+
+    .ql-editor {
+      text-align: right;
+
+      &.ql-blank::before {
+        right: 16px;
+        left: auto;
+      }
+    }
+
+    .ql-toolbar.ql-snow {
+      direction: rtl;
+
+      .ql-formats {
+        margin-right: 0;
+        margin-left: 8px;
+      }
+    }
+  }
+
+  // LTR Variant
+  &.dir-ltr {
+    direction: ltr;
+
+    .ql-editor {
+      text-align: left;
+
+      &.ql-blank::before {
+        left: 16px;
+        right: auto;
+      }
+    }
+
+    .ql-toolbar.ql-snow {
+      direction: ltr;
+    }
+  }
+}

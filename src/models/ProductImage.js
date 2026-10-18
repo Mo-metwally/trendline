@@ -17,7 +17,7 @@ const ProductImage = sequelize.define('ProductImage', {
     onDelete: 'CASCADE',
   },
   image_url: {
-    type: DataTypes.STRING(500),
+    type: DataTypes.TEXT,
     allowNull: false,
   },
   alt_text_ar: {

@@ -1,13 +1,41 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { FaBoxesStacked, FaFolderTree, FaPlus, FaChevronDown, FaTag, FaCopyright } from 'react-icons/fa6';
 import './AdminSidebar.scss';
 
 export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar' }) {
   const pathname = usePathname();
   const isRtl = lang === 'ar';
+
+  const [openMenus, setOpenMenus] = useState(() => ({
+    products: pathname === '/admin/products' || pathname?.startsWith('/admin/products/'),
+    categories: pathname === '/admin/categories' || pathname?.startsWith('/admin/categories/'),
+    tags: pathname === '/admin/tags' || pathname?.startsWith('/admin/tags/') || pathname === '/admin/brands' || pathname?.startsWith('/admin/brands/'),
+  }));
+
+  useEffect(() => {
+    if (pathname === '/admin/products' || pathname?.startsWith('/admin/products/')) {
+      setOpenMenus((prev) => ({ ...prev, products: true }));
+    }
+    if (pathname === '/admin/categories' || pathname?.startsWith('/admin/categories/')) {
+      setOpenMenus((prev) => ({ ...prev, categories: true }));
+    }
+    if (pathname === '/admin/tags' || pathname?.startsWith('/admin/tags/') || pathname === '/admin/brands' || pathname?.startsWith('/admin/brands/')) {
+      setOpenMenus((prev) => ({ ...prev, tags: true }));
+    }
+  }, [pathname]);
+
+  const toggleSubmenu = (menuKey) => {
+    if (isCollapsed && onToggleCollapse) {
+      onToggleCollapse();
+      setOpenMenus((prev) => ({ ...prev, [menuKey]: true }));
+      return;
+    }
+    setOpenMenus((prev) => ({ ...prev, [menuKey]: !prev[menuKey] }));
+  };
 
   const menuSections = [
     {
@@ -31,7 +59,7 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
       title: isRtl ? 'إدارة المتجر والكتالوج' : 'Catalog & Store',
       items: [
         {
-          href: '/admin/products',
+          key: 'products',
           label: isRtl ? 'المنتجات' : 'Products',
           icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -39,10 +67,22 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <path d="M16 10a4 4 0 0 1-8 0"></path>
             </svg>
-          )
+          ),
+          subItems: [
+            {
+              href: '/admin/products',
+              label: isRtl ? 'كل المنتجات' : 'All Products',
+              icon: <FaBoxesStacked size={13} />
+            },
+            {
+              href: '/admin/products/add',
+              label: isRtl ? 'إضافة منتج' : 'Add Product',
+              icon: <FaPlus size={12} />
+            }
+          ]
         },
         {
-          href: '/admin/categories',
+          key: 'categories',
           label: isRtl ? 'الأقسام والتصنيفات' : 'Categories',
           icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -53,12 +93,55 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
               <line x1="3" y1="12" x2="3.01" y2="12"></line>
               <line x1="3" y1="18" x2="3.01" y2="18"></line>
             </svg>
-          )
+          ),
+          subItems: [
+            {
+              href: '/admin/categories',
+              label: isRtl ? 'كل الأقسام' : 'All Categories',
+              icon: <FaFolderTree size={13} />
+            },
+            {
+              href: '/admin/categories/add',
+              label: isRtl ? 'إضافة قسم' : 'Add Category',
+              icon: <FaPlus size={12} />
+            }
+          ]
+        },
+        {
+          key: 'tags',
+          label: isRtl ? 'وسوم الربط والعلامات' : 'Tags & Brands',
+          icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+              <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            </svg>
+          ),
+          subItems: [
+            {
+              href: '/admin/brands',
+              label: isRtl ? 'إدارة البراندات' : 'Manage Brands',
+              icon: <FaCopyright size={13} />
+            },
+            {
+              href: '/admin/brands/add',
+              label: isRtl ? 'إضافة براند جديد' : 'Add Brand',
+              icon: <FaPlus size={12} />
+            },
+            {
+              href: '/admin/tags',
+              label: isRtl ? 'وسوم الربط (Tags)' : 'Rule Tags',
+              icon: <FaTag size={13} />
+            },
+            {
+              href: '/admin/tags/add',
+              label: isRtl ? 'إضافة وسم جديد' : 'Add New Tag',
+              icon: <FaPlus size={12} />
+            }
+          ]
         },
         {
           href: '/admin/bundles',
           label: isRtl ? 'باقات التوفير (Bundles)' : 'Bundles',
-          badge: isRtl ? 'ديناميكي' : 'Dynamic',
           icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="21 8 21 21 3 21 3 8"></polyline>
@@ -75,7 +158,6 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
         {
           href: '/admin/orders',
           label: isRtl ? 'إدارة الطلبات' : 'Orders',
-          badge: 'New',
           icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -151,7 +233,6 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
         {
           href: '/admin/slider',
           label: isRtl ? 'سلايدر الرئيسية' : 'Hero Slider',
-          badge: isRtl ? 'سحب وإفلات' : 'Drag & Drop',
           icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -237,6 +318,57 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
           <div key={sIdx} className="nav-section-group">
             {!isCollapsed && <div className="nav-section-title">{section.title}</div>}
             {section.items.map((item, iIdx) => {
+              if (item.subItems) {
+                const isParentActive =
+                  item.key === 'products'
+                    ? pathname === '/admin/products' || pathname?.startsWith('/admin/products/')
+                    : item.key === 'categories'
+                    ? pathname === '/admin/categories' || pathname?.startsWith('/admin/categories/')
+                    : item.key === 'tags'
+                    ? pathname === '/admin/tags' || pathname?.startsWith('/admin/tags/') || pathname?.startsWith('/admin/brands/')
+                    : false;
+                const isOpen = !!openMenus[item.key];
+
+                return (
+                  <div key={iIdx} className="nav-group-container">
+                    <button
+                      type="button"
+                      className={`nav-item nav-parent-btn ${isParentActive ? 'parent-active' : ''} ${isOpen ? 'menu-open' : ''}`}
+                      onClick={() => toggleSubmenu(item.key)}
+                      title={item.label}
+                      aria-expanded={isOpen}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      {!isCollapsed && <span className="nav-label">{item.label}</span>}
+                      {!isCollapsed && (
+                        <span className={`nav-chevron ${isOpen ? 'rotated' : ''}`}>
+                          <FaChevronDown size={11} />
+                        </span>
+                      )}
+                    </button>
+
+                    {!isCollapsed && isOpen && (
+                      <div className="nav-sub-menu">
+                        {item.subItems.map((subItem, subIdx) => {
+                          const isSubActive = pathname === subItem.href;
+                          return (
+                            <Link
+                              key={subIdx}
+                              href={subItem.href}
+                              className={`nav-sub-item ${isSubActive ? 'active' : ''}`}
+                              title={subItem.label}
+                            >
+                              <span className="nav-sub-icon">{subItem.icon}</span>
+                              <span className="nav-sub-label">{subItem.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               const isActive = pathname === item.href;
               return (
                 <Link

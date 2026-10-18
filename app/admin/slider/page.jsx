@@ -10,6 +10,7 @@ import {
   AdminStatsCard,
   AdminModal,
   CustomSelect,
+  useToast,
 } from '@/src/components/adminComponents';
 import {
   FaFloppyDisk,
@@ -21,13 +22,33 @@ import {
   FaFolder,
   FaBox,
   FaPlus,
+  FaPalette,
+  FaMoon,
+  FaSun,
+  FaWandMagicSparkles,
+  FaTrashCan,
+  FaTag,
+  FaCircleCheck,
+  FaSliders,
+  FaGem,
+  FaCloudArrowUp,
+  FaArrowUp,
+  FaArrowDown,
+  FaPenToSquare,
+  FaRotate,
+  FaCheck,
+  FaArrowRight,
+  FaArrowLeft,
+  FaCircleInfo,
 } from 'react-icons/fa6';
+import { formatFactory, formatBytes } from '@/src/utils/formatFactory';
 import HeroSlider from '@/src/components/homeComponents/HeroSlider/HeroSlider';
 import './SliderManagement.scss';
 
 export default function AdminSliderPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const toast = useToast();
   const [adminUser, setAdminUser] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [lang, setLang] = useState('ar');
@@ -69,8 +90,61 @@ export default function AdminSliderPage() {
     is_active: true,
   });
 
+  // Advanced Theme & Finish Studio State
+  const [themeMode, setThemeMode] = useState('preset'); // 'preset' | 'solid' | 'gradient'
+  const [presetStyle, setPresetStyle] = useState('card-white-glass');
+  const [solidColor, setSolidColor] = useState('#0057C2');
+  const [gradientColor1, setGradientColor1] = useState('#0057C2');
+  const [gradientColor2, setGradientColor2] = useState('#0f172a');
+  const [gradientAngle, setGradientAngle] = useState(135);
+  const [cardFinish, setCardFinish] = useState('glass'); // 'glass' | 'glossy' | 'matt'
+  const [textColorMode, setTextColorMode] = useState('auto'); // 'auto' | 'light' | 'dark' | 'custom'
+  const [customTextColor, setCustomTextColor] = useState('#ffffff');
+  const [modalPreviewLang, setModalPreviewLang] = useState('ar');
+
+  // Media / formatFactory State
   const [imagePreview, setImagePreview] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStats, setUploadStats] = useState(null);
+  const fileInputRef = useRef(null);
+
   const isRtl = lang === 'ar';
+
+  // Real-time computed mockup visual style
+  const computedCardStyle = useMemo(() => {
+    let background = 'rgba(255, 255, 255, 0.95)';
+    let color = '#0f172a';
+
+    if (themeMode === 'gradient') {
+      background = `linear-gradient(${gradientAngle}deg, ${gradientColor1} 0%, ${gradientColor2} 100%)`;
+      color = textColorMode === 'dark' ? '#0f172a' : (textColorMode === 'custom' ? customTextColor : '#ffffff');
+    } else if (themeMode === 'solid') {
+      background = solidColor;
+      color = textColorMode === 'light' ? '#ffffff' : (textColorMode === 'custom' ? customTextColor : '#0f172a');
+    } else {
+      if (presetStyle === 'card-primary-cta') {
+        background = 'linear-gradient(145deg, #0057C2 0%, #003c88 100%)';
+        color = '#ffffff';
+      } else if (presetStyle === 'card-bank-promo') {
+        background = 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)';
+        color = '#ffffff';
+      } else if (presetStyle === 'card-cyber-purple') {
+        background = 'linear-gradient(135deg, #6366f1 0%, #312e81 100%)';
+        color = '#ffffff';
+      } else if (presetStyle === 'card-neon-emerald') {
+        background = 'linear-gradient(135deg, #059669 0%, #064e3b 100%)';
+        color = '#ffffff';
+      } else if (presetStyle === 'card-sunset-coral') {
+        background = 'linear-gradient(135deg, #ea580c 0%, #991b1b 100%)';
+        color = '#ffffff';
+      } else {
+        background = 'rgba(255, 255, 255, 0.95)';
+        color = '#0f172a';
+      }
+    }
+
+    return { background, color };
+  }, [themeMode, presetStyle, solidColor, gradientColor1, gradientColor2, gradientAngle, textColorMode, customTextColor]);
 
   const categorySelectOptions = useMemo(() => {
     return categories.map((c) => ({
@@ -256,13 +330,16 @@ export default function AdminSliderPage() {
       const json = await res.json();
       if (json.success) {
         setHasUnsavedOrder(false);
-        alert(isRtl ? 'تم حفظ الترتيب الجديد بنجاح!' : 'Order saved successfully!');
+        toast.success(
+          isRtl ? 'تم حفظ الترتيب الجديد للسلايدر بنجاح!' : 'Order saved successfully!',
+          isRtl ? 'حفظ الترتيب' : 'Order Updated'
+        );
       } else {
-        alert(json.message || 'Failed to save order');
+        toast.error(json.message || (isRtl ? 'فشل حفظ الترتيب' : 'Failed to save order'));
       }
     } catch (err) {
       console.error(err);
-      alert('Error saving order');
+      toast.error(isRtl ? 'حدث خطأ أثناء حفظ الترتيب' : 'Error saving order');
     } finally {
       setSavingOrder(false);
     }
@@ -276,17 +353,24 @@ export default function AdminSliderPage() {
         ? `http://${window.location.hostname}:5000`
         : 'http://localhost:5000';
 
+      const nextStatus = !banner.is_active;
       const res = await fetch(`${apiHost}/api/v1/cms/banners/${banner.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ is_active: !banner.is_active }),
+        body: JSON.stringify({ is_active: nextStatus }),
       });
 
       if (res.ok) {
-        setBanners(banners.map((b) => (b.id === banner.id ? { ...b, is_active: !b.is_active } : b)));
+        setBanners(banners.map((b) => (b.id === banner.id ? { ...b, is_active: nextStatus } : b)));
+        toast.info(
+          nextStatus
+            ? (isRtl ? 'تم تفعيل ظهور الكارت في السلايدر' : 'Card activated')
+            : (isRtl ? 'تم إخفاء الكارت من السلايدر' : 'Card deactivated'),
+          isRtl ? 'حالة الكارت' : 'Card Status'
+        );
       }
     } catch (err) {
       console.error(err);
@@ -313,7 +397,19 @@ export default function AdminSliderPage() {
     });
     setLinkMode('category');
     setSelectedCategoryId(categories[0]?.id || '');
+    setSelectedProductId(products[0]?.id || '');
     setImagePreview('');
+    setUploadStats(null);
+    setThemeMode('preset');
+    setPresetStyle('card-white-glass');
+    setSolidColor('#0057C2');
+    setGradientColor1('#0057C2');
+    setGradientColor2('#0f172a');
+    setGradientAngle(135);
+    setCardFinish('glass');
+    setTextColorMode('auto');
+    setCustomTextColor('#ffffff');
+    setModalPreviewLang(lang);
     setIsModalOpen(true);
   };
 
@@ -337,6 +433,41 @@ export default function AdminSliderPage() {
     });
 
     setImagePreview(banner.image_url || '');
+    setUploadStats(null);
+    setModalPreviewLang(lang);
+
+    // Parse Theme and Finish
+    if (banner.bg_style?.startsWith('custom:')) {
+      try {
+        const parsed = JSON.parse(banner.bg_style.replace('custom:', ''));
+        if (parsed.bgType === 'gradient') {
+          setThemeMode('gradient');
+          setGradientColor1(parsed.color1 || '#0057C2');
+          setGradientColor2(parsed.color2 || '#0f172a');
+          setGradientAngle(parsed.gradientAngle || 135);
+        } else if (parsed.bgType === 'solid') {
+          setThemeMode('solid');
+          setSolidColor(parsed.color1 || '#0057C2');
+        } else if (parsed.bgType === 'preset') {
+          setThemeMode('preset');
+          setPresetStyle(parsed.preset || 'card-white-glass');
+        }
+        setCardFinish(parsed.finish || 'glass');
+        if (parsed.textColor) {
+          setCustomTextColor(parsed.textColor);
+          setTextColorMode(parsed.textColor === '#ffffff' ? 'light' : (parsed.textColor === '#0f172a' ? 'dark' : 'custom'));
+        }
+      } catch (e) {
+        setThemeMode('preset');
+        setPresetStyle('card-white-glass');
+        setCardFinish('glass');
+      }
+    } else {
+      setThemeMode('preset');
+      setPresetStyle(banner.bg_style || 'card-white-glass');
+      setCardFinish('glass');
+      setTextColorMode('auto');
+    }
 
     // Determine link mode
     if (banner.target_url?.startsWith('/categories/')) {
@@ -356,24 +487,102 @@ export default function AdminSliderPage() {
     setIsModalOpen(true);
   };
 
-  // Handle Image Drop / Pick
+  // Image Processing & Compression via formatFactory (WebP 80%)
+  const handleProcessImage = async (file) => {
+    if (!file) return;
+    try {
+      setIsUploading(true);
+      const result = await formatFactory(file, { quality: 0.8, maxDimension: 1200 });
+      setImagePreview(result.previewUrl);
+      setUploadStats({
+        originalSize: result.originalSize,
+        formattedSize: result.formattedSize,
+        savingsPercent: result.savingsPercent,
+      });
+
+      // Upload formatted WebP to server in background
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', result.file);
+      uploadFormData.append('mediaType', 'image');
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          setFormData((prev) => ({ ...prev, image_url: data.url }));
+          toast.success(
+            isRtl
+              ? `تم ضغط الصورة إلى WebP وحفظها على الخادم بنجاح (وفر ${result.savingsPercent}%)`
+              : `Image converted to WebP and saved successfully (Saved ${result.savingsPercent}%)`,
+            isRtl ? 'محرك formatFactory' : 'formatFactory Engine'
+          );
+          return;
+        }
+      }
+
+      // If server upload endpoint fails, convert to permanent Base64 Data URL so it is never a temporary dead blob!
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result;
+        setFormData((prev) => ({ ...prev, image_url: base64data }));
+      };
+      reader.readAsDataURL(result.file);
+
+      toast.info(
+        isRtl ? 'تم تجهيز الصورة ومعاينتها محلياً بصيغة WebP 80%' : 'Image ready locally (WebP 80%)',
+        isRtl ? 'محرك formatFactory' : 'formatFactory'
+      );
+    } catch (err) {
+      console.error('Image processing error:', err);
+      toast.error(
+        err.message || (isRtl ? 'فشل معالجة الصورة عبر formatFactory' : 'Failed to process image'),
+        isRtl ? 'خطأ في معالجة الوسائط' : 'Media Processing Error'
+      );
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleImageFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const blobUrl = URL.createObjectURL(file);
-      setImagePreview(blobUrl);
-      setFormData((prev) => ({ ...prev, image_url: blobUrl }));
+    if (file) handleProcessImage(file);
+  };
+
+  const handleDropImage = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      handleProcessImage(file);
     }
   };
 
   // Save Add/Edit Banner
   const handleSaveBanner = async (e) => {
     e.preventDefault();
+    if (isUploading) {
+      toast.warning(
+        isRtl ? 'جاري استكمال رفع ومعالجة الصورة، يرجى الانتظار ثانية واحدة...' : 'Image upload is still completing, please wait a second...',
+        isRtl ? 'جاري الرفع' : 'Uploading'
+      );
+      return;
+    }
+
     try {
       const token = await ensureAuthToken();
       const apiHost = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
         ? `http://${window.location.hostname}:5000`
         : 'http://localhost:5000';
+
+      // Ensure image_url is not a dead temporary blob URL
+      let finalImageUrl = formData.image_url || imagePreview || '';
+      if (finalImageUrl.startsWith('blob:') && imagePreview) {
+        finalImageUrl = imagePreview;
+      }
 
       // Build target URL based on selected link mode
       let targetUrl = formData.target_url;
@@ -385,9 +594,45 @@ export default function AdminSliderPage() {
         targetUrl = prod ? `/products/${prod.slug || prod.id}` : '/products';
       }
 
+      // Serialize bg_style
+      let finalBgStyle = 'card-white-glass';
+      if (themeMode === 'preset') {
+        if (cardFinish !== 'glass') {
+          finalBgStyle = `custom:${JSON.stringify({
+            bgType: 'preset',
+            preset: presetStyle,
+            finish: cardFinish,
+          })}`;
+        } else {
+          finalBgStyle = presetStyle;
+        }
+      } else if (themeMode === 'solid') {
+        finalBgStyle = `custom:${JSON.stringify({
+          bgType: 'solid',
+          color1: solidColor,
+          finish: cardFinish,
+          textColor: textColorMode === 'light' ? '#ffffff' : (textColorMode === 'dark' ? '#0f172a' : customTextColor),
+        })}`;
+      } else if (themeMode === 'gradient') {
+        finalBgStyle = `custom:${JSON.stringify({
+          bgType: 'gradient',
+          color1: gradientColor1,
+          color2: gradientColor2,
+          gradientAngle: Number(gradientAngle),
+          finish: cardFinish,
+          textColor: textColorMode === 'dark' ? '#0f172a' : (textColorMode === 'custom' ? customTextColor : '#ffffff'),
+        })}`;
+      }
+
       const payload = {
         ...formData,
+        image_url: finalImageUrl,
+        title_en: formData.title_en || formData.title_ar,
+        subtitle_en: formData.subtitle_en || formData.subtitle_ar,
+        button_text_ar: formData.button_text_ar || 'تسوق الآن',
+        button_text_en: formData.button_text_en || 'Shop Now',
         target_url: targetUrl,
+        bg_style: finalBgStyle,
       };
 
       let res;
@@ -414,13 +659,19 @@ export default function AdminSliderPage() {
       const json = await res.json();
       if (json.success) {
         setIsModalOpen(false);
+        toast.success(
+          editingBanner
+            ? (isRtl ? 'تم تحديث كارت السلايدر بنجاح' : 'Slider card updated successfully')
+            : (isRtl ? 'تم إضافة كارت السلايدر الجديد بنجاح' : 'New slider card created successfully'),
+          isRtl ? 'إدارة السلايدر' : 'Slider Management'
+        );
         fetchData();
       } else {
-        alert(json.message || 'Error saving banner');
+        toast.error(json.message || (isRtl ? 'حدث خطأ أثناء حفظ الكارت' : 'Error saving card'));
       }
     } catch (err) {
       console.error(err);
-      alert('Network error saving banner');
+      toast.error(isRtl ? 'خطأ في الاتصال بالخادم أثناء الحفظ' : 'Network error saving banner');
     }
   };
 
@@ -440,9 +691,16 @@ export default function AdminSliderPage() {
 
       if (res.ok) {
         setBanners(banners.filter((b) => b.id !== id));
+        toast.success(
+          isRtl ? 'تم حذف الكارت من السلايدر بنجاح' : 'Card deleted successfully',
+          isRtl ? 'حذف كارت' : 'Card Deleted'
+        );
+      } else {
+        toast.error(isRtl ? 'تعذر حذف الكارت' : 'Could not delete card');
       }
     } catch (err) {
       console.error(err);
+      toast.error(isRtl ? 'خطأ في الاتصال أثناء حذف الكارت' : 'Error deleting card');
     }
   };
 
@@ -647,224 +905,728 @@ export default function AdminSliderPage() {
       </div>
 
       {/* Add / Edit Banner Modal */}
+      {/* Add / Edit Banner Modal (Amazon / Salla Grade Studio) */}
       {isModalOpen && (
         <AdminModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          title={editingBanner ? (isRtl ? 'تعديل كارت السلايدر' : 'Edit Slider Card') : (isRtl ? 'إضافة كارت جديد للسلايدر' : 'Add New Slider Card')}
+          size="xl"
+          title={
+            editingBanner
+              ? (isRtl ? 'تعديل وتخصيص كارت السلايدر' : 'Edit & Customize Slider Card')
+              : (isRtl ? 'استوديو إضافة كارت جديد للسلايدر' : 'Hero Slider Card Studio')
+          }
         >
-          <form className="slide-edit-form" onSubmit={handleSaveBanner}>
-            {/* Title bilingual */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>{isRtl ? 'عنوان الكارت (عربي) *' : 'Title (Arabic) *'}</label>
-                <input
-                  type="text"
-                  required
-                  className="form-input"
-                  value={formData.title_ar}
-                  onChange={(e) => setFormData({ ...formData, title_ar: e.target.value })}
-                  placeholder="مثال: أجهزة لابتوب وإكسسواراتها"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>{isRtl ? 'عنوان الكارت (إنجليزي)' : 'Title (English)'}</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.title_en}
-                  onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
-                  placeholder="e.g. Laptops & Accessories"
-                />
-              </div>
-            </div>
-
-            {/* Subtitle bilingual */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>{isRtl ? 'الوصف الفرعي (عربي)' : 'Subtitle (Arabic)'}</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.subtitle_ar}
-                  onChange={(e) => setFormData({ ...formData, subtitle_ar: e.target.value })}
-                  placeholder="مثال: أداء أعلى... لكل احتياجاتك"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>{isRtl ? 'الوصف الفرعي (إنجليزي)' : 'Subtitle (English)'}</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.subtitle_en}
-                  onChange={(e) => setFormData({ ...formData, subtitle_en: e.target.value })}
-                  placeholder="e.g. Top Performance for Every Need"
-                />
-              </div>
-            </div>
-
-            {/* Card Visual Theme Selection */}
-            <div className="form-group">
-              <label>{isRtl ? 'نمط ومظهر الكارت (Card Theme)' : 'Card Visual Style'}</label>
-              <div className="style-picker-grid">
-                <div
-                  className={`style-option-btn ${formData.bg_style === 'card-white-glass' ? 'selected' : ''}`}
-                  onClick={() => setFormData({ ...formData, bg_style: 'card-white-glass' })}
-                >
-                  <div className="style-sample-bar" style={{ background: 'rgba(255, 255, 255, 0.9)', border: '1px solid #cbd5e1' }}></div>
-                  <span className="style-label">{isRtl ? 'زجاجي أبيض (منتج)' : 'White Glass'}</span>
-                </div>
-
-                <div
-                  className={`style-option-btn ${formData.bg_style === 'card-primary-cta' ? 'selected' : ''}`}
-                  onClick={() => setFormData({ ...formData, bg_style: 'card-primary-cta' })}
-                >
-                  <div className="style-sample-bar" style={{ background: 'linear-gradient(135deg, #0057C2 0%, #003c88 100%)' }}></div>
-                  <span className="style-label">{isRtl ? 'أزرق ملكي (عضوية/CTA)' : 'Royal Blue CTA'}</span>
-                </div>
-
-                <div
-                  className={`style-option-btn ${formData.bg_style === 'card-bank-promo' ? 'selected' : ''}`}
-                  onClick={() => setFormData({ ...formData, bg_style: 'card-bank-promo' })}
-                >
-                  <div className="style-sample-bar" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}></div>
-                  <span className="style-label">{isRtl ? 'داكن (عروض البنوك)' : 'Dark Bank Promo'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Destination Link Chooser (Category vs Product vs Custom) */}
-            <div className="form-group">
-              <label>{isRtl ? 'الرابط الموجه إليه عند الضغط (Destination Link)' : 'Target Link'}</label>
-
-              <div className="link-mode-tabs">
-                <button
-                  type="button"
-                  className={`tab-btn ${linkMode === 'category' ? 'active' : ''}`}
-                  onClick={() => setLinkMode('category')}
-                >
-                  {isRtl ? 'ربط بقسم / تصنيف' : 'Category'}
-                </button>
-                <button
-                  type="button"
-                  className={`tab-btn ${linkMode === 'product' ? 'active' : ''}`}
-                  onClick={() => setLinkMode('product')}
-                >
-                  {isRtl ? 'ربط بمنتج محدد' : 'Product'}
-                </button>
-                <button
-                  type="button"
-                  className={`tab-btn ${linkMode === 'custom' ? 'active' : ''}`}
-                  onClick={() => setLinkMode('custom')}
-                >
-                  {isRtl ? 'رابط مخصص أو صفحة' : 'Custom Page'}
-                </button>
-              </div>
-
-              {linkMode === 'category' && (
-                <div style={{ marginTop: '8px' }}>
-                  <CustomSelect
-                    value={selectedCategoryId}
-                    onChange={(val) => setSelectedCategoryId(val)}
-                    options={categorySelectOptions}
-                    placeholder={isRtl ? 'اختر القسم...' : 'Select category...'}
-                    searchable={true}
-                    isRtl={isRtl}
-                  />
-                </div>
-              )}
-
-              {linkMode === 'product' && (
-                <div style={{ marginTop: '8px' }}>
-                  <CustomSelect
-                    value={selectedProductId}
-                    onChange={(val) => setSelectedProductId(val)}
-                    options={productSelectOptions}
-                    placeholder={isRtl ? 'اختر المنتج...' : 'Select product...'}
-                    searchable={true}
-                    isRtl={isRtl}
-                  />
-                </div>
-              )}
-
-              {linkMode === 'custom' && (
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="مثال: /deals أو /register أو /track-order"
-                  value={formData.target_url}
-                  onChange={(e) => setFormData({ ...formData, target_url: e.target.value })}
-                />
-              )}
-            </div>
-
-            {/* Image Upload / URL */}
-            <div className="form-group">
-              <label>{isRtl ? 'صورة الكارت (Drag & Drop أو URL)' : 'Card Image'}</label>
-              <div className="image-drop-area">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageFileChange}
-                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
-                />
-                {imagePreview ? (
-                  <img src={imagePreview} alt="Preview" className="preview-image-box" />
-                ) : (
-                  <div className="drop-label">
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <FaFolder style={{ color: 'var(--main-color)' }} />
-                      {isRtl ? 'اضغط أو اسحب صورة هنا للمعاينة الفورية' : 'Click or drag image here'}
-                    </span>
+          <form className="advanced-slider-modal-form" onSubmit={handleSaveBanner}>
+            <div className="advanced-slider-modal-grid">
+              {/* Column 1: Customization Controls & Form Fields */}
+              <div className="modal-form-column">
+                
+                {/* 1. Bilingual Titles & Text */}
+                <div className="editor-fieldset-card">
+                  <div className="fieldset-header">
+                    <div className="icon-title">
+                      <FaPenToSquare style={{ color: 'var(--main-color)' }} />
+                      <h4>{isRtl ? 'النصوص والعناوين الترويجية (ثنائي اللغة)' : 'Headlines & Copy (Bilingual)'}</h4>
+                    </div>
+                    <span className="lang-indicator-pill">AR & EN</span>
                   </div>
-                )}
-              </div>
-              <input
-                type="text"
-                className="form-input"
-                style={{ marginTop: '8px' }}
-                placeholder={isRtl ? 'أو أدخل رابط الصورة المباشر (URL)' : 'Or paste direct image URL'}
-                value={formData.image_url}
-                onChange={(e) => {
-                  setFormData({ ...formData, image_url: e.target.value });
-                  setImagePreview(e.target.value);
-                }}
-              />
-            </div>
 
-            {/* Buttons & Status */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>{isRtl ? 'نص الزر (عربي)' : 'Button Text (Arabic)'}</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.button_text_ar}
-                  onChange={(e) => setFormData({ ...formData, button_text_ar: e.target.value })}
-                />
+                  {/* Main Title Row */}
+                  <div className="form-row-dual">
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'عنوان الكارت الرئيسي (عربي) *' : 'Card Main Title (Arabic) *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="field-input"
+                        value={formData.title_ar}
+                        onChange={(e) => setFormData({ ...formData, title_ar: e.target.value })}
+                        placeholder="مثال: أجهزة لابتوب وإكسسواراتها"
+                      />
+                    </div>
+
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'عنوان الكارت (إنجليزي)' : 'Card Main Title (English)'}
+                      </label>
+                      <input
+                        type="text"
+                        className="field-input"
+                        value={formData.title_en}
+                        onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
+                        placeholder="e.g. Laptops & Tech Accessories"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Subtitle Row */}
+                  <div className="form-row-dual">
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'الوصف الفرعي / الميزة (عربي)' : 'Subtitle / Tagline (Arabic)'}
+                      </label>
+                      <input
+                        type="text"
+                        className="field-input"
+                        value={formData.subtitle_ar}
+                        onChange={(e) => setFormData({ ...formData, subtitle_ar: e.target.value })}
+                        placeholder="مثال: أداء أعلى ومزايا غير مسبوقة لكل احتياجاتك"
+                      />
+                    </div>
+
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'الوصف الفرعي (إنجليزي)' : 'Subtitle / Tagline (English)'}
+                      </label>
+                      <input
+                        type="text"
+                        className="field-input"
+                        value={formData.subtitle_en}
+                        onChange={(e) => setFormData({ ...formData, subtitle_en: e.target.value })}
+                        placeholder="e.g. Peak Performance for All Your Needs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Promotional Badge & Button Row */}
+                  <div className="form-row-dual">
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'بادج ترويجي (عربي)' : 'Promotional Badge (Arabic)'}
+                        <span className="hint-tag">{isRtl ? 'Badge' : 'Tag'}</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="field-input"
+                        value={formData.badge_text_ar}
+                        onChange={(e) => setFormData({ ...formData, badge_text_ar: e.target.value })}
+                        placeholder="مثال: خصم 20% أو حصري أو وصل حديثاً"
+                      />
+                    </div>
+
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'بادج ترويجي (إنجليزي)' : 'Promotional Badge (English)'}
+                        <span className="hint-tag">Badge</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="field-input"
+                        value={formData.badge_text_en}
+                        onChange={(e) => setFormData({ ...formData, badge_text_en: e.target.value })}
+                        placeholder="e.g. 20% OFF or Limited Deal"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row-dual">
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'نص زر الإجراء (عربي) *' : 'Button CTA (Arabic) *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="field-input"
+                        value={formData.button_text_ar}
+                        onChange={(e) => setFormData({ ...formData, button_text_ar: e.target.value })}
+                        placeholder="تسوق الآن"
+                      />
+                    </div>
+
+                    <div className="form-group-field">
+                      <label>
+                        {isRtl ? 'نص زر الإجراء (إنجليزي) *' : 'Button CTA (English) *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="field-input"
+                        value={formData.button_text_en}
+                        onChange={(e) => setFormData({ ...formData, button_text_en: e.target.value })}
+                        placeholder="Shop Now"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Target Link Destination */}
+                <div className="editor-fieldset-card">
+                  <div className="fieldset-header">
+                    <div className="icon-title">
+                      <FaBox style={{ color: 'var(--main-color)' }} />
+                      <h4>{isRtl ? 'الرابط الموجه إليه عند الضغط (Destination Link)' : 'Destination Link Routing'}</h4>
+                    </div>
+                  </div>
+
+                  <div className="link-mode-tabs-cluster">
+                    <button
+                      type="button"
+                      className={`mode-btn ${linkMode === 'category' ? 'active' : ''}`}
+                      onClick={() => setLinkMode('category')}
+                    >
+                      <FaFolder />
+                      <span>{isRtl ? 'ربط بقسم / تصنيف' : 'Category Link'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`mode-btn ${linkMode === 'product' ? 'active' : ''}`}
+                      onClick={() => setLinkMode('product')}
+                    >
+                      <FaTag />
+                      <span>{isRtl ? 'ربط بمنتج محدد' : 'Product Link'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`mode-btn ${linkMode === 'custom' ? 'active' : ''}`}
+                      onClick={() => setLinkMode('custom')}
+                    >
+                      <FaSliders />
+                      <span>{isRtl ? 'رابط مخصص أو صفحة' : 'Custom Route'}</span>
+                    </button>
+                  </div>
+
+                  {linkMode === 'category' && (
+                    <div className="route-select-wrapper">
+                      <CustomSelect
+                        value={selectedCategoryId}
+                        onChange={(val) => setSelectedCategoryId(val)}
+                        options={categorySelectOptions}
+                        placeholder={isRtl ? 'ابحث واختر القسم المستهدف...' : 'Search and select category...'}
+                        searchable={true}
+                        isRtl={isRtl}
+                      />
+                    </div>
+                  )}
+
+                  {linkMode === 'product' && (
+                    <div className="route-select-wrapper">
+                      <CustomSelect
+                        value={selectedProductId}
+                        onChange={(val) => setSelectedProductId(val)}
+                        options={productSelectOptions}
+                        placeholder={isRtl ? 'ابحث واختر المنتج المستهدف...' : 'Search and select product...'}
+                        searchable={true}
+                        isRtl={isRtl}
+                      />
+                    </div>
+                  )}
+
+                  {linkMode === 'custom' && (
+                    <div className="route-select-wrapper">
+                      <input
+                        type="text"
+                        className="field-input"
+                        placeholder="مثال: /deals أو /register أو /track-order أو https://..."
+                        value={formData.target_url}
+                        onChange={(e) => setFormData({ ...formData, target_url: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Card Visual Style & Color Studio */}
+                <div className="editor-fieldset-card studio-theme-card">
+                  <div className="fieldset-header">
+                    <div className="icon-title">
+                      <FaPalette style={{ color: 'var(--main-color)' }} />
+                      <h4>{isRtl ? 'استوديو نمط ومظهر وألوان الكارت (Card Theme & Colors)' : 'Card Visual Style & Color Studio'}</h4>
+                    </div>
+                  </div>
+
+                  {/* Mode Selector (Presets vs Solid vs Gradient) */}
+                  <div className="theme-mode-pills">
+                    <button
+                      type="button"
+                      className={`theme-pill ${themeMode === 'preset' ? 'active' : ''}`}
+                      onClick={() => setThemeMode('preset')}
+                    >
+                      <FaGem />
+                      <span>{isRtl ? 'قوالب جاهزة (Presets)' : 'Ready Presets'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`theme-pill ${themeMode === 'solid' ? 'active' : ''}`}
+                      onClick={() => setThemeMode('solid')}
+                    >
+                      <FaPalette />
+                      <span>{isRtl ? 'لون مخصص مصمت (Solid)' : 'Solid Color'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`theme-pill ${themeMode === 'gradient' ? 'active' : ''}`}
+                      onClick={() => setThemeMode('gradient')}
+                    >
+                      <FaWandMagicSparkles />
+                      <span>{isRtl ? 'تدرج بين لونين (Gradient)' : '2-Color Gradient'}</span>
+                    </button>
+                  </div>
+
+                  {/* Presets Grid */}
+                  {themeMode === 'preset' && (
+                    <div className="presets-select-grid">
+                      <div
+                        className={`preset-card-item ${presetStyle === 'card-white-glass' ? 'active' : ''}`}
+                        onClick={() => setPresetStyle('card-white-glass')}
+                      >
+                        <div className="preset-swatch-box swatch-white-glass"></div>
+                        <span className="preset-name">{isRtl ? 'زجاجي أبيض (منتج)' : 'White Glass'}</span>
+                      </div>
+
+                      <div
+                        className={`preset-card-item ${presetStyle === 'card-primary-cta' ? 'active' : ''}`}
+                        onClick={() => setPresetStyle('card-primary-cta')}
+                      >
+                        <div className="preset-swatch-box swatch-royal-blue"></div>
+                        <span className="preset-name">{isRtl ? 'أزرق ملكي (عضوية/CTA)' : 'Royal Blue'}</span>
+                      </div>
+
+                      <div
+                        className={`preset-card-item ${presetStyle === 'card-bank-promo' ? 'active' : ''}`}
+                        onClick={() => setPresetStyle('card-bank-promo')}
+                      >
+                        <div className="preset-swatch-box swatch-dark-bank"></div>
+                        <span className="preset-name">{isRtl ? 'داكن (عروض البنوك)' : 'Dark Bank'}</span>
+                      </div>
+
+                      <div
+                        className={`preset-card-item ${presetStyle === 'card-cyber-purple' ? 'active' : ''}`}
+                        onClick={() => setPresetStyle('card-cyber-purple')}
+                      >
+                        <div className="preset-swatch-box swatch-cyber-purple"></div>
+                        <span className="preset-name">{isRtl ? 'سايبر بنفسجي' : 'Cyber Purple'}</span>
+                      </div>
+
+                      <div
+                        className={`preset-card-item ${presetStyle === 'card-neon-emerald' ? 'active' : ''}`}
+                        onClick={() => setPresetStyle('card-neon-emerald')}
+                      >
+                        <div className="preset-swatch-box swatch-neon-emerald"></div>
+                        <span className="preset-name">{isRtl ? 'زمردي نيون' : 'Neon Emerald'}</span>
+                      </div>
+
+                      <div
+                        className={`preset-card-item ${presetStyle === 'card-sunset-coral' ? 'active' : ''}`}
+                        onClick={() => setPresetStyle('card-sunset-coral')}
+                      >
+                        <div className="preset-swatch-box swatch-sunset-coral"></div>
+                        <span className="preset-name">{isRtl ? 'مرجاني دافئ' : 'Sunset Coral'}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Solid Color Customizer */}
+                  {themeMode === 'solid' && (
+                    <div className="custom-color-controls">
+                      <div className="color-picker-dual-row">
+                        <div className="color-input-tile">
+                          <label>{isRtl ? 'اختر لون خلفية الكارت' : 'Card Background Color'}</label>
+                          <div className="color-picker-input-group">
+                            <input
+                              type="color"
+                              className="color-wheel-circle"
+                              value={solidColor}
+                              onChange={(e) => setSolidColor(e.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="color-hex-text"
+                              value={solidColor}
+                              onChange={(e) => setSolidColor(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="quick-swatches-cluster">
+                          <label>{isRtl ? 'باليت ألوان سريعة:' : 'Quick Swatches:'}</label>
+                          <div className="swatches-row">
+                            {['#0057C2', '#0f172a', '#10b981', '#6366f1', '#e11d48', '#ea580c', '#f8fafc'].map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                className="swatch-btn"
+                                style={{ background: c }}
+                                onClick={() => setSolidColor(c)}
+                                title={c}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Two-Color Gradient Customizer */}
+                  {themeMode === 'gradient' && (
+                    <div className="custom-gradient-controls">
+                      <div className="gradient-pickers-row">
+                        <div className="color-input-tile">
+                          <label>{isRtl ? 'اللون الأول (بداية التدرج)' : 'Color 1 (Start)'}</label>
+                          <div className="color-picker-input-group">
+                            <input
+                              type="color"
+                              className="color-wheel-circle"
+                              value={gradientColor1}
+                              onChange={(e) => setGradientColor1(e.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="color-hex-text"
+                              value={gradientColor1}
+                              onChange={(e) => setGradientColor1(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="color-input-tile">
+                          <label>{isRtl ? 'اللون الثاني (نهاية التدرج)' : 'Color 2 (End)'}</label>
+                          <div className="color-picker-input-group">
+                            <input
+                              type="color"
+                              className="color-wheel-circle"
+                              value={gradientColor2}
+                              onChange={(e) => setGradientColor2(e.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="color-hex-text"
+                              value={gradientColor2}
+                              onChange={(e) => setGradientColor2(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="angle-input-tile">
+                          <label>{isRtl ? 'زاوية التدرج' : 'Gradient Angle'}</label>
+                          <select
+                            className="field-select"
+                            value={gradientAngle}
+                            onChange={(e) => setGradientAngle(Number(e.target.value))}
+                          >
+                            <option value={45}>45° ({isRtl ? 'مائل قطري' : 'Diagonal'})</option>
+                            <option value={90}>90° ({isRtl ? 'أفقي' : 'Horizontal'})</option>
+                            <option value={135}>135° ({isRtl ? 'قياسي عصري' : 'Modern 135°'})</option>
+                            <option value={180}>180° ({isRtl ? 'رأسي من أعلى لأسفل' : 'Vertical'})</option>
+                            <option value={225}>225° ({isRtl ? 'معكوس قطري' : 'Reverse Diagonal'})</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Finish Texture Chips (Glass vs Glossy vs Matt) */}
+                  <div className="finish-texture-section">
+                    <label className="section-sub-label">
+                      <FaWandMagicSparkles style={{ color: 'var(--main-color)' }} />
+                      <span>{isRtl ? 'المظهر واللمسة النهائية (Finish & Texture):' : 'Card Surface Finish & Texture:'}</span>
+                    </label>
+
+                    <div className="finish-chips-group">
+                      <button
+                        type="button"
+                        className={`finish-chip-btn ${cardFinish === 'glass' ? 'active' : ''}`}
+                        onClick={() => setCardFinish('glass')}
+                      >
+                        <div className="finish-icon-preview finish-preview-glass"></div>
+                        <div className="finish-info">
+                          <span className="finish-title">{isRtl ? 'زجاجي شفاف (Glass)' : 'Frosted Glass'}</span>
+                          <span className="finish-desc">{isRtl ? 'تأثير زجاج بلوري عصري' : 'Soft frosted blur'}</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`finish-chip-btn ${cardFinish === 'glossy' ? 'active' : ''}`}
+                        onClick={() => setCardFinish('glossy')}
+                      >
+                        <div className="finish-icon-preview finish-preview-glossy"></div>
+                        <div className="finish-info">
+                          <span className="finish-title">{isRtl ? 'لامع (Glossy)' : 'Glossy Sheen'}</span>
+                          <span className="finish-desc">{isRtl ? 'بريق كريستالي عاكس' : 'Reflective crystal sheen'}</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`finish-chip-btn ${cardFinish === 'matt' ? 'active' : ''}`}
+                        onClick={() => setCardFinish('matt')}
+                      >
+                        <div className="finish-icon-preview finish-preview-matt"></div>
+                        <div className="finish-info">
+                          <span className="finish-title">{isRtl ? 'مطفي (Matt / Matte)' : 'Matte Satin'}</span>
+                          <span className="finish-desc">{isRtl ? 'مخملي ناعم غير عاكس' : 'Velvety smooth diffusion'}</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Text Color Chooser for solid / gradient */}
+                  {(themeMode === 'solid' || themeMode === 'gradient') && (
+                    <div className="text-color-mode-row">
+                      <label>{isRtl ? 'لون نصوص الكارت:' : 'Card Text Color:'}</label>
+                      <div className="text-color-pills">
+                        <button
+                          type="button"
+                          className={`txt-pill ${textColorMode === 'light' || (textColorMode === 'auto' && themeMode !== 'solid') ? 'active' : ''}`}
+                          onClick={() => { setTextColorMode('light'); setCustomTextColor('#ffffff'); }}
+                        >
+                          <span className="dot-white"></span>
+                          <span>{isRtl ? 'نصوص بيضاء ناصعة' : 'White Text'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`txt-pill ${textColorMode === 'dark' ? 'active' : ''}`}
+                          onClick={() => { setTextColorMode('dark'); setCustomTextColor('#0f172a'); }}
+                        >
+                          <span className="dot-dark"></span>
+                          <span>{isRtl ? 'نصوص داكنة كحلية' : 'Dark Navy Text'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. formatFactory Image Engine & Dropzone */}
+                <div className="editor-fieldset-card">
+                  <div className="fieldset-header">
+                    <div className="icon-title">
+                      <FaWandMagicSparkles style={{ color: 'var(--main-color)' }} />
+                      <h4>{isRtl ? 'صورة الكارت ومعالج الوسائط (formatFactory WebP 80%)' : 'Card Asset (formatFactory WebP 80%)'}</h4>
+                    </div>
+                    {uploadStats && (
+                      <span className="savings-badge-pill">
+                        {isRtl ? `وفر ${uploadStats.savingsPercent}%` : `Saved ${uploadStats.savingsPercent}%`}
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className={`format-factory-dropzone ${isUploading ? 'uploading' : ''}`}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDropImage}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      style={{ display: 'none' }}
+                    />
+
+                    {isUploading ? (
+                      <div className="dropzone-loading">
+                        <FaRotate className="spinner-icon" />
+                        <span>{isRtl ? 'جاري ضغط وتحويل الصورة إلى WebP 80%...' : 'Compressing to WebP 80%...'}</span>
+                      </div>
+                    ) : imagePreview ? (
+                      <div className="dropzone-preview-box">
+                        <img src={imagePreview} alt="Preview" className="uploaded-thumb" />
+                        <div className="thumb-overlay">
+                          <FaCloudArrowUp />
+                          <span>{isRtl ? 'اضغط أو اسحب صورة جديدة للتغيير' : 'Click or drop to replace'}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="dropzone-empty-prompt">
+                        <div className="cloud-icon-circle">
+                          <FaCloudArrowUp />
+                        </div>
+                        <h5>{isRtl ? 'اسحب وأفلت صورة الكارت هنا أو اضغط للاختيار' : 'Drag & drop card asset or click to browse'}</h5>
+                        <p>{isRtl ? 'يقوم محرك formatFactory تلقائياً بتحويل الصورة لصيغة WebP المضغوطة بجودة 80%' : 'formatFactory auto-converts to optimized 80% WebP'}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="url-fallback-row">
+                    <label>{isRtl ? 'أو أدخل رابط مباشر للصورة (Direct URL):' : 'Or enter direct asset URL:'}</label>
+                    <input
+                      type="text"
+                      className="field-input"
+                      placeholder="https://images.trendlineeg.com/products/laptop-hero.png"
+                      value={formData.image_url}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData({ ...formData, image_url: val });
+                        setImagePreview(val);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Form Actions Footer */}
+                <div className="modal-actions-footer">
+                  <button
+                    type="button"
+                    className="btn-cancel"
+                    onClick={() => setIsModalOpen(false)}
+                  >
+                    {isRtl ? 'إلغاء' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-submit-hero"
+                    disabled={isUploading}
+                  >
+                    <FaCheck />
+                    <span>
+                      {isUploading
+                        ? (isRtl ? 'جاري المعالجة...' : 'Processing...')
+                        : editingBanner
+                        ? (isRtl ? 'حفظ تعديلات الكارت' : 'Save Changes')
+                        : (isRtl ? 'إضافة الكارت للسلايدر' : 'Add Card to Slider')}
+                    </span>
+                  </button>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>{isRtl ? 'بادج ترويجي (Badge / Tag)' : 'Badge Text'}</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="مثال: 10% OFF أو عرض محدود"
-                  value={formData.badge_text_ar}
-                  onChange={(e) => setFormData({ ...formData, badge_text_ar: e.target.value })}
-                />
-              </div>
-            </div>
+              {/* Column 2: Sticky Realtime Interactive Mockup Card */}
+              <div className="modal-preview-column">
+                <div className="mockup-sticky-wrapper">
+                  <div className="mockup-header-bar">
+                    <div className="header-info">
+                      <FaEye style={{ color: 'var(--main-color)' }} />
+                      <span>{isRtl ? 'معاينة حية ومباشرة (Real-Time)' : 'Live Interactive Mockup'}</span>
+                    </div>
 
-            <div className="form-modal-actions">
-              <button type="button" className="btn-cancel" onClick={() => setIsModalOpen(false)}>
-                {isRtl ? 'إلغاء' : 'Cancel'}
-              </button>
-              <button type="submit" className="btn-submit">
-                {editingBanner ? (isRtl ? 'حفظ التعديلات' : 'Update Card') : (isRtl ? 'إضافة الكارت' : 'Create Card')}
-              </button>
+                    <div className="mockup-lang-toggle">
+                      <button
+                        type="button"
+                        className={`lang-btn ${modalPreviewLang === 'ar' ? 'active' : ''}`}
+                        onClick={() => setModalPreviewLang('ar')}
+                      >
+                        عربي
+                      </button>
+                      <button
+                        type="button"
+                        className={`lang-btn ${modalPreviewLang === 'en' ? 'active' : ''}`}
+                        onClick={() => setModalPreviewLang('en')}
+                      >
+                        English
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* The Live Rendered Card Mockup */}
+                  <div
+                    className={`live-slider-mockup-card ${
+                      cardFinish === 'glossy'
+                        ? 'card-finish-glossy'
+                        : cardFinish === 'matt'
+                        ? 'card-finish-matt'
+                        : 'card-finish-glass'
+                    } ${imagePreview || formData.image_url ? 'has-full-bg' : ''}`}
+                    style={computedCardStyle}
+                  >
+                    {/* 100% Full Bleed Background Image Layer */}
+                    {(imagePreview || formData.image_url) ? (
+                      <div className="mockup-full-bg-wrap">
+                        <img
+                          src={imagePreview || formData.image_url}
+                          alt="Card Full Background"
+                          className="mockup-full-bg-img"
+                        />
+                        <div
+                          className={`mockup-full-bg-overlay ${
+                            computedCardStyle.color === '#0f172a' ? 'overlay-light' : 'overlay-dark'
+                          }`}
+                        />
+                      </div>
+                    ) : null}
+
+                    {/* Top Content (Badge, Title, Subtitle) */}
+                    <div className="mockup-card-top-content">
+                      {/* Top Badge */}
+                      {(modalPreviewLang === 'ar' ? formData.badge_text_ar : (formData.badge_text_en || formData.badge_text_ar)) && (
+                        <div className="mockup-top-badge">
+                          <span>
+                            {modalPreviewLang === 'ar' ? formData.badge_text_ar : (formData.badge_text_en || formData.badge_text_ar)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Main Title */}
+                      <h3
+                        className="mockup-title"
+                        style={{ color: computedCardStyle.color }}
+                      >
+                        {(modalPreviewLang === 'ar' ? formData.title_ar : (formData.title_en || formData.title_ar)) ||
+                          (isRtl ? 'عنوان الكارت الرئيسي' : 'Card Main Title')}
+                      </h3>
+
+                      {/* Subtitle */}
+                      <p
+                        className="mockup-subtitle"
+                        style={{ color: computedCardStyle.color, opacity: 0.9 }}
+                      >
+                        {(modalPreviewLang === 'ar' ? formData.subtitle_ar : (formData.subtitle_en || formData.subtitle_ar)) ||
+                          (isRtl ? 'الوصف الترويجي والمزايا الحصرية' : 'Promotional tagline and perks')}
+                      </p>
+                    </div>
+
+                    {/* If no image yet, show a clean modern placeholder badge */}
+                    {!(imagePreview || formData.image_url) && (
+                      <div className="mockup-empty-center-hint">
+                        <FaCloudArrowUp style={{ fontSize: '30px', opacity: 0.4 }} />
+                        <span>{isRtl ? 'ارفع صورة لتغطي مساحة الكارت بالكامل' : 'Upload an image to fill the entire card'}</span>
+                      </div>
+                    )}
+
+                    {/* Visual Center Spacer */}
+                    <div className="mockup-card-center-spacer" />
+
+                    {/* CTA Button */}
+                    <div className="mockup-cta-btn-box">
+                      <span className="mockup-cta-btn">
+                        <span>
+                          {(modalPreviewLang === 'ar'
+                            ? formData.button_text_ar
+                            : (formData.button_text_en || formData.button_text_ar)) ||
+                            (isRtl ? 'تسوق الآن' : 'Shop Now')}
+                        </span>
+                        <span className="mockup-arrow-icon">
+                          {modalPreviewLang === 'ar' ? '←' : '→'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Realtime Specs Footer Info */}
+                  <div className="mockup-specs-footer">
+                    <div className="spec-badge">
+                      <span className="spec-label">{isRtl ? 'النمط:' : 'Theme:'}</span>
+                      <span className="spec-val">
+                        {themeMode === 'gradient'
+                          ? (isRtl ? 'تدرج مخصص' : 'Custom Gradient')
+                          : themeMode === 'solid'
+                          ? (isRtl ? 'لون مصمت' : 'Solid Color')
+                          : (isRtl ? 'قالب متجر' : 'Store Preset')}
+                      </span>
+                    </div>
+
+                    <div className="spec-badge">
+                      <span className="spec-label">{isRtl ? 'المظهر:' : 'Finish:'}</span>
+                      <span className="spec-val">
+                        {cardFinish === 'glossy'
+                          ? (isRtl ? 'لامع' : 'Glossy')
+                          : cardFinish === 'matt'
+                          ? (isRtl ? 'مطفي' : 'Matte')
+                          : (isRtl ? 'زجاجي' : 'Glass')}
+                      </span>
+                    </div>
+
+                    <div className="spec-badge">
+                      <span className="spec-label">{isRtl ? 'التوجيه:' : 'Route:'}</span>
+                      <span className="spec-val">
+                        {linkMode === 'category' ? '/categories/...' : linkMode === 'product' ? '/products/...' : formData.target_url || '/'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </form>
         </AdminModal>
