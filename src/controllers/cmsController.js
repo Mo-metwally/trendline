@@ -34,7 +34,12 @@ class CmsController {
 
   static async getAllBannersAdmin(req, res, next) {
     try {
+      const { placement } = req.query;
+      const whereClause = {};
+      if (placement) whereClause.placement = placement;
+
       const banners = await Banner.findAll({
+        where: whereClause,
         order: [['sort_order', 'ASC'], ['id', 'ASC']],
       });
       return res.status(200).json({ success: true, data: banners });
@@ -267,7 +272,34 @@ class CmsController {
 
   static async upsertSiteSetting(req, res, next) {
     try {
-      const { setting_key, setting_value_ar, setting_value_en, setting_value_common, setting_group } = req.body;
+      const { setting_key, setting_value_ar, setting_value_en, setting_value_common, setting_group, settings } = req.body;
+
+      if (Array.isArray(settings)) {
+        for (const item of settings) {
+          if (item && item.setting_key) {
+            await SiteSetting.upsert({
+              setting_key: item.setting_key,
+              setting_value_ar: item.setting_value_ar || null,
+              setting_value_en: item.setting_value_en || null,
+              setting_value_common: item.setting_value_common !== undefined ? String(item.setting_value_common) : null,
+              setting_group: item.setting_group || 'general',
+            });
+          }
+        }
+        return res.status(200).json({ success: true, message: 'Settings batch updated successfully' });
+      }
+
+      if (settings && typeof settings === 'object') {
+        for (const [key, val] of Object.entries(settings)) {
+          await SiteSetting.upsert({
+            setting_key: key,
+            setting_value_common: typeof val === 'object' ? JSON.stringify(val) : String(val),
+            setting_group: setting_group || 'slider',
+          });
+        }
+        return res.status(200).json({ success: true, message: 'Settings updated successfully' });
+      }
+
       const [setting] = await SiteSetting.upsert({
         setting_key,
         setting_value_ar,

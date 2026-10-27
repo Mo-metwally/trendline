@@ -22,7 +22,6 @@ export default function CategoryGrid({ lang = 'ar' }) {
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && json.data.length > 0 && isMounted) {
             setCategories(json.data);
-            setLoading(false);
             return;
           }
         }
@@ -94,7 +93,6 @@ export default function CategoryGrid({ lang = 'ar' }) {
             ],
           },
         ]);
-        setLoading(false);
       }
     };
 

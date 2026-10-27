@@ -24,7 +24,7 @@ router.patch('/shipping-zones/:id', authMiddleware, permitRoles('super_admin', '
 router.get('/coupons', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.getCoupons);
 router.post('/coupons', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.createCoupon);
 router.get('/contact-messages', authMiddleware, permitRoles('super_admin', 'erp_manager', 'sales_agent'), CmsController.getContactMessages);
-router.post('/settings', authMiddleware, permitRoles('super_admin'), CmsController.upsertSiteSetting);
+router.post('/settings', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.upsertSiteSetting);
 
 module.exports = router;
 

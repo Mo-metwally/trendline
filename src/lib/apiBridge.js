@@ -1,5 +1,4 @@
 const { EventEmitter } = require('events');
-const { NextResponse } = require('next/server');
 const { app, initDb } = require('../serverApp');
 
 async function handleNextApiRequest(request) {
@@ -170,7 +169,7 @@ async function handleNextApiRequest(request) {
   }
 
   const isNullBodyStatus = [204, 205, 304].includes(finalStatus);
-  return new NextResponse(isNullBodyStatus ? null : finalBody, {
+  return new Response(isNullBodyStatus ? null : finalBody, {
     status: finalStatus,
     headers: resHeaders,
   });

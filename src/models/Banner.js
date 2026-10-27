@@ -8,7 +8,7 @@ const Banner = sequelize.define('Banner', {
     autoIncrement: true,
   },
   placement: {
-    type: DataTypes.ENUM('hero_vertical_slider', 'mid_page_promo'),
+    type: DataTypes.ENUM('hero_vertical_slider', 'mid_page_promo', 'image_slider'),
     allowNull: false,
     defaultValue: 'hero_vertical_slider',
   },

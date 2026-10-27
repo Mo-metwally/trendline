@@ -17,10 +17,10 @@ const resolveBannerImage = (url) => {
   return url;
 };
 
-export default function HeroSlider({ lang = 'ar' }) {
+export default function HeroSlider({ lang = 'ar', banners: propBanners }) {
   const isRtl = lang === 'ar';
-  const [banners, setBanners] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [banners, setBanners] = useState(propBanners || []);
+  const [loading, setLoading] = useState(!propBanners);
   const [activeSlide, setActiveSlide] = useState(0);
   const scrollContainerRef = useRef(null);
 
@@ -102,11 +102,21 @@ export default function HeroSlider({ lang = 'ar' }) {
 
   // Fetch banners from API
   useEffect(() => {
+    if (propBanners !== undefined && propBanners !== null) {
+      const processed = (propBanners.length > 0 ? propBanners : fallbackBanners).map((b) => ({
+        ...b,
+        image_url: resolveBannerImage(b.image_url, b.id),
+      }));
+      setBanners(processed);
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
     const fetchBanners = async () => {
       try {
         const apiHost = getApiHost();
-        const res = await fetch(`${apiHost}/api/v1/cms/banners`);
+        const res = await fetch(`${apiHost}/api/v1/cms/banners?placement=hero_vertical_slider`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && json.data.length > 0 && isMounted) {
@@ -134,7 +144,7 @@ export default function HeroSlider({ lang = 'ar' }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [propBanners]);
 
   // Scroll tracking to update dots
   const handleScroll = () => {

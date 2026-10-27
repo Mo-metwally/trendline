@@ -12,8 +12,11 @@ const permitRoles = (...allowedRoles) => {
       });
     }
 
+    const userRole = (req.user.role || '').toLowerCase();
+    const normalizedRoles = allowedRoles.map((r) => r.toLowerCase());
+
     // super_admin always has universal authorization
-    if (req.user.role === 'super_admin' || allowedRoles.includes(req.user.role)) {
+    if (userRole === 'super_admin' || normalizedRoles.includes(userRole)) {
       return next();
     }
 

@@ -8,7 +8,6 @@ import './CategoryGrid.scss';
 export default function CategoryGrid({ lang = 'ar' }) {
   const isRtl = lang === 'ar';
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [activeDot, setActiveDot] = useState(0);
   const trackRef = useRef(null);
 
@@ -23,7 +22,6 @@ export default function CategoryGrid({ lang = 'ar' }) {
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && json.data.length > 0 && isMounted) {
             setCategories(json.data);
-            setLoading(false);
             return;
           }
         }
@@ -95,7 +93,6 @@ export default function CategoryGrid({ lang = 'ar' }) {
             ],
           },
         ]);
-        setLoading(false);
       }
     };
 
