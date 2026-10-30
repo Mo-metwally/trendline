@@ -481,13 +481,13 @@ function EditCategoryContent() {
 
   if (pageLoading) {
     return (
-      <div className="add-category-page" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="add-category-page" dir={isRtl ? 'rtl' : 'ltr'} suppressHydrationWarning>
         <AdminSidebar
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           lang={lang}
         />
-        <div className="add-category-wrapper">
+        <div className={`add-category-wrapper ${sidebarCollapsed ? 'collapsed' : ''}`}>
           <AdminHeader
             adminUser={adminUser}
             onLogout={() => {
@@ -495,7 +495,8 @@ function EditCategoryContent() {
               router.push('/admin/login');
             }}
             lang={lang}
-            onToggleLang={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+            onToggleLanguage={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
             isSidebarCollapsed={sidebarCollapsed}
           />
           <main className="add-category-content">
@@ -510,7 +511,7 @@ function EditCategoryContent() {
   }
 
   return (
-    <div className="add-category-page" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="add-category-page" dir={isRtl ? 'rtl' : 'ltr'} suppressHydrationWarning>
       {/* 1. Sidebar */}
       <AdminSidebar
         isCollapsed={sidebarCollapsed}
@@ -519,7 +520,7 @@ function EditCategoryContent() {
       />
 
       {/* Main Wrapper */}
-      <div className="add-category-wrapper">
+      <div className={`add-category-wrapper ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {/* 2. Header */}
         <AdminHeader
           adminUser={adminUser}
@@ -528,14 +529,15 @@ function EditCategoryContent() {
             router.push('/admin/login');
           }}
           lang={lang}
-          onToggleLang={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+          onToggleLanguage={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
           isSidebarCollapsed={sidebarCollapsed}
         />
 
         {/* 3. Main Content Body */}
         <main className="add-category-content">
           {/* Top Bar with Breadcrumbs & Action Buttons */}
-          <div className="top-action-bar">
+          <div className="page-nav-header">
             <div className="breadcrumbs-line">
               <Link href="/admin">{isRtl ? 'لوحة التحكم' : 'Dashboard'}</Link>
               <span className="separator">/</span>
@@ -745,18 +747,17 @@ function EditCategoryContent() {
                     onChange={(e) => setTagSearchTerm(e.target.value)}
                   />
 
-                  <div className="tags-cloud-scroll">
+                  <div className="tags-cloud">
                     {filteredTags.map((tag) => {
                       const isSelected = selectedTagIds.includes(tag.id);
                       return (
                         <div
                           key={tag.id}
-                          className={`tag-selectable-chip ${isSelected ? 'selected' : ''}`}
+                          className={`tag-toggle-chip ${isSelected ? 'active' : ''}`}
                           onClick={() => handleToggleTag(tag.id)}
                         >
-                          <span className="tag-hash">#</span>
-                          <span>{isRtl ? tag.name_ar || tag.name_en : tag.name_en || tag.name_ar}</span>
-                          {isSelected && <span className="check-mark"><FaCheck /></span>}
+                          <span>#{isRtl ? tag.name_ar || tag.name_en : tag.name_en || tag.name_ar}</span>
+                          {isSelected && <FaCheck style={{ fontSize: '10px' }} />}
                         </div>
                       );
                     })}
@@ -1409,28 +1410,34 @@ function EditCategoryContent() {
 
                 {/* Home Grid Toggle */}
                 <div className="setting-toggle-item">
-                  <div className="toggle-info">
-                    <strong>{isRtl ? 'عرض في شبكة الصفحة الرئيسية (Home Grid)' : 'Show in Homepage Grid'}</strong>
-                    <p>{isRtl ? 'إظهار القسم ضمن بطاقات استعراض الفئات في الرئيسية' : 'Display this category on the homepage grid'}</p>
+                  <div className="toggle-meta">
+                    <span className="toggle-title">{isRtl ? 'عرض في شبكة الصفحة الرئيسية (Home Grid)' : 'Show in Homepage Grid'}</span>
+                    <span className="toggle-sub">{isRtl ? 'إظهار القسم ضمن بطاقات استعراض الفئات في الرئيسية' : 'Display this category on the homepage grid'}</span>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={showInHomeGrid}
-                    onChange={(e) => setShowInHomeGrid(e.target.checked)}
-                  />
+                  <label className="custom-switch">
+                    <input
+                      type="checkbox"
+                      checked={showInHomeGrid}
+                      onChange={(e) => setShowInHomeGrid(e.target.checked)}
+                    />
+                    <span className="slider"></span>
+                  </label>
                 </div>
 
                 {/* Active Status Toggle */}
                 <div className="setting-toggle-item">
-                  <div className="toggle-info">
-                    <strong>{isRtl ? 'حالة القسم (نشط / معطل)' : 'Category Status'}</strong>
-                    <p>{isRtl ? 'إمكانية تصفح القسم والمنتجات المرتبطة به' : 'Make category accessible to store customers'}</p>
+                  <div className="toggle-meta">
+                    <span className="toggle-title">{isRtl ? 'حالة القسم (نشط / معطل)' : 'Category Status'}</span>
+                    <span className="toggle-sub">{isRtl ? 'إمكانية تصفح القسم والمنتجات المرتبطة به' : 'Make category accessible to store customers'}</span>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={isActive}
-                    onChange={(e) => setIsActive(e.target.checked)}
-                  />
+                  <label className="custom-switch">
+                    <input
+                      type="checkbox"
+                      checked={isActive}
+                      onChange={(e) => setIsActive(e.target.checked)}
+                    />
+                    <span className="slider"></span>
+                  </label>
                 </div>
               </div>
             </div>

@@ -43,6 +43,38 @@ const NewsletterSubscriber = require('./NewsletterSubscriber');
 const StaticPage = require('./StaticPage');
 const SiteSetting = require('./SiteSetting');
 
+// Reset existing associations on hot-reload to prevent SequelizeAssociationError under Turbopack HMR
+[
+  AdminUser,
+  AdminOtp,
+  Brand,
+  Category,
+  Tag,
+  CategoryTag,
+  Product,
+  ProductCategory,
+  ProductTag,
+  ProductImage,
+  ProductReview,
+  Bundle,
+  BundleItem,
+  BundleCategory,
+  InventoryTransaction,
+  Supplier,
+  PurchaseOrder,
+  PurchaseOrderItem,
+  Order,
+  OrderItem,
+  OrderTrackingLog,
+  OrderReturn,
+  OrderReturnItem,
+  FinancialTransaction,
+].forEach((model) => {
+  if (model && model.associations) {
+    model.associations = {};
+  }
+});
+
 // --- ASSOCIATIONS ---
 
 // 1. Admin Users & Relationships

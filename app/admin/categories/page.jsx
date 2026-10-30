@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -21,6 +21,14 @@ import {
   FaStar,
   FaCheck,
   FaEye,
+  FaChevronDown,
+  FaChevronUp,
+  FaArrowUpRightFromSquare,
+  FaPenToSquare,
+  FaTrashCan,
+  FaPowerOff,
+  FaLayerGroup,
+  FaBoxesStacked,
 } from 'react-icons/fa6';
 import './Categories.scss';
 
@@ -412,159 +420,7 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  // Table Columns Definition
-  const columns = [
-    {
-      key: 'image',
-      label: isRtl ? 'صورة القسم' : 'Image',
-      render: (_, row) => (
-        <div className="category-table-thumb-box" title={row.name_ar}>
-          {row.image_url ? (
-            <img
-              src={row.image_url}
-              alt={row.name_ar}
-              className="cat-thumb-img"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex';
-              }}
-            />
-          ) : null}
-          <div className="cat-thumb-placeholder" style={{ display: row.image_url ? 'none' : 'flex' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <circle cx="8.5" cy="8.5" r="1.5"></circle>
-              <polyline points="21 15 16 10 5 21"></polyline>
-            </svg>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'name',
-      label: isRtl ? 'القسم والرمز' : 'Category & Icon',
-      render: (_, row) => (
-        <div className="category-name-cell">
-          <div className="category-icon-box" title={isRtl ? 'أيقونة / رمز القسم' : 'Category Icon'}>
-            {renderCategoryIcon(row.icon_url)}
-          </div>
-          <div className="category-name-meta">
-            <span className="name-ar">{row.name_ar}</span>
-            <span className="name-en">{row.name_en}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'slug',
-      label: 'Slug',
-      render: (val) => <code style={{ color: 'var(--main-color)', fontWeight: 700 }}>{val}</code>,
-    },
-    {
-      key: 'parent',
-      label: isRtl ? 'المستوى' : 'Level',
-      render: (_, row) => {
-        if (!row.parent_id) {
-          return <span className="parent-pill main">{isRtl ? '⭐ رئيسي' : '⭐ Main'}</span>;
-        }
-        return (
-          <span className="parent-pill sub">
-            {isRtl ? '↳ فرعي من: ' : '↳ Sub of: '}
-            <strong>{row.parent?.name_ar || row.parent?.name_en || `#${row.parent_id}`}</strong>
-          </span>
-        );
-      },
-    },
-    {
-      key: 'starting_price',
-      label: isRtl ? 'يبدأ من' : 'From Price',
-      render: (val) => (val ? <strong>{Number(val).toLocaleString()} ج.م</strong> : <span style={{ color: '#a0aec0' }}>—</span>),
-    },
-    {
-      key: 'show_in_home_grid',
-      label: isRtl ? 'شبكة الهوم' : 'Home Grid',
-      render: (val) => (
-        <span className={`home-grid-badge ${val ? 'enabled' : 'disabled'}`}>
-          {val ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <FaCheck /> {isRtl ? 'معروض بالهوم' : 'In Home Grid'}
-            </span>
-          ) : (
-            isRtl ? '— غير معروض' : '— Not in Grid'
-          )}
-        </span>
-      ),
-    },
-    {
-      key: 'tags',
-      label: isRtl ? 'وسوم الربط التلقائي (Hybrid Rules)' : 'Auto-Linking Tags',
-      render: (_, row) => (
-        <div className="tag-chips-container">
-          {row.tags && row.tags.length > 0 ? (
-            row.tags.map((t, idx) => (
-              <span key={t.id || idx} className="rule-tag-chip" title={t.name_en}>
-                #{isRtl ? t.name_ar || t.name_en : t.name_en || t.name_ar}
-              </span>
-            ))
-          ) : (
-            <span className="no-tags">{isRtl ? 'لا توجد وسوم' : 'No tags linked'}</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'products_count',
-      label: isRtl ? 'المنتجات' : 'Products',
-      render: (val) => <span style={{ fontWeight: 800 }}>{val || 0}</span>,
-    },
-    {
-      key: 'is_active',
-      label: isRtl ? 'الحالة' : 'Status',
-      render: (val) => <AdminStatusBadge status={val ? 'ACTIVE' : 'INACTIVE'} lang={lang} />,
-    },
-    {
-      key: 'actions',
-      label: isRtl ? 'الإجراءات' : 'Actions',
-      render: (_, row) => (
-        <div className="action-buttons-group">
-          <Link
-            href={`/admin/categories/edit/${row.id}`}
-            className="btn-edit"
-            title={isRtl ? 'تعديل القسم' : 'Edit Category'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-            <span>{isRtl ? 'تعديل' : 'Edit'}</span>
-          </Link>
-
-          <button
-            type="button"
-            className="btn-toggle"
-            onClick={() => handleToggleStatus(row)}
-            title={row.is_active ? (isRtl ? 'تعطيل القسم' : 'Deactivate') : (isRtl ? 'تفعيل القسم' : 'Activate')}
-          >
-            {row.is_active ? (isRtl ? 'تعطيل' : 'Disable') : (isRtl ? 'تفعيل' : 'Enable')}
-          </button>
-
-          <button
-            type="button"
-            className="btn-delete"
-            onClick={() => setCategoryToDelete(row)}
-            title={isRtl ? 'حذف القسم' : 'Delete'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-        </div>
-      ),
-    },
-  ];
-
-  // Hierarchy Tree structure for Tree View
+  // Hierarchy Tree structure for Tree View & Subcategory Lookup
   const mainCategoriesWithSubs = useMemo(() => {
     const mains = categories.filter((c) => !c.parent_id);
     return mains.map((main) => ({
@@ -573,8 +429,52 @@ export default function AdminCategoriesPage() {
     }));
   }, [categories]);
 
+  // Collapsible Row State & Pagination for Smart 2-Row Table
+  const [expandedRowIds, setExpandedRowIds] = useState([]);
+  const [collapsedTreeIds, setCollapsedTreeIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType]);
+
+  const totalPages = Math.ceil(filteredCategories.length / itemsPerPage) || 1;
+  const paginatedCategories = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredCategories.slice(start, start + itemsPerPage);
+  }, [filteredCategories, currentPage, itemsPerPage]);
+
+  const toggleExpandRow = (id) => {
+    const key = String(id);
+    setExpandedRowIds((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
+    );
+  };
+
+  const toggleExpandAllRows = () => {
+    const pageKeys = paginatedCategories.map((c) => String(c.id));
+    const allExpanded = pageKeys.length > 0 && pageKeys.every((k) => expandedRowIds.includes(k));
+    if (allExpanded) {
+      setExpandedRowIds((prev) => prev.filter((k) => !pageKeys.includes(k)));
+    } else {
+      setExpandedRowIds((prev) => Array.from(new Set([...prev, ...pageKeys])));
+    }
+  };
+
+  const toggleTreeBranch = (id) => {
+    const key = String(id);
+    setCollapsedTreeIds((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
+    );
+  };
+
+  const allCurrentPageExpanded =
+    paginatedCategories.length > 0 &&
+    paginatedCategories.every((c) => expandedRowIds.includes(String(c.id)));
+
   return (
-    <div className="categories-page-layout" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="categories-page-layout" dir={isRtl ? 'rtl' : 'ltr'} suppressHydrationWarning>
       {/* 1. Sidebar */}
       <AdminSidebar
         isCollapsed={sidebarCollapsed}
@@ -583,7 +483,7 @@ export default function AdminCategoriesPage() {
       />
 
       {/* Main Wrapper */}
-      <div className="categories-main-wrapper">
+      <div className={`categories-main-wrapper ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {/* 2. Header */}
         <AdminHeader
           adminUser={adminUser}
@@ -728,7 +628,7 @@ export default function AdminCategoriesPage() {
                     <line x1="3" y1="12" x2="3.01" y2="12"></line>
                     <line x1="3" y1="18" x2="3.01" y2="18"></line>
                   </svg>
-                  <span>{isRtl ? 'جدول' : 'Table'}</span>
+                  <span>{isRtl ? 'جدول تفاعلي' : 'Table'}</span>
                 </button>
                 <button
                   type="button"
@@ -747,91 +647,564 @@ export default function AdminCategoriesPage() {
             </div>
           </div>
 
-          {/* Main Content: Table View vs Tree View */}
+          {/* Main Content: Smart Collapsible 2-Row Table vs Collapsible Tree View */}
           {viewMode === 'table' ? (
-            <AdminDataTable
-              title={isRtl ? `قائمة الأقسام والتصنيفات (${filteredCategories.length})` : `Categories List (${filteredCategories.length})`}
-              columns={columns}
-              data={filteredCategories}
-              searchable={false}
-              itemsPerPage={10}
-              lang={lang}
-            />
+            <div className="smart-categories-table-card">
+              {/* Table Top Bar */}
+              <div className="smart-table-header">
+                <div className="header-left-title">
+                  <h3>{isRtl ? 'قائمة الأقسام والتصنيفات' : 'Categories Directory'}</h3>
+                  <span className="count-pill">
+                    {filteredCategories.length} {isRtl ? 'قسم' : 'items'}
+                  </span>
+                </div>
+
+                <div className="header-right-controls">
+                  <button
+                    type="button"
+                    className={`btn-expand-all-toggle ${allCurrentPageExpanded ? 'active' : ''}`}
+                    onClick={toggleExpandAllRows}
+                  >
+                    {allCurrentPageExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                    <span>
+                      {allCurrentPageExpanded
+                        ? isRtl
+                          ? 'طي جميع التفاصيل'
+                          : 'Collapse All Details'
+                        : isRtl
+                        ? 'توسيع كل الصفوف (عرض صفين)'
+                        : 'Expand All Rows'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Responsive Table */}
+              <div className="smart-table-scroll">
+                <table className="smart-cats-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '30%' }}>{isRtl ? 'القسم والهوية' : 'Category & Identity'}</th>
+                      <th style={{ width: '17%' }}>{isRtl ? 'المستوى والتفرع' : 'Hierarchy Level'}</th>
+                      <th style={{ width: '16%' }}>{isRtl ? 'التسعير والظهور' : 'Price & Display'}</th>
+                      <th style={{ width: '17%' }}>{isRtl ? 'المنتجات والوسوم' : 'Products & Tags'}</th>
+                      <th style={{ width: '8%' }}>{isRtl ? 'الحالة' : 'Status'}</th>
+                      <th style={{ width: '12%' }}>{isRtl ? 'الإجراءات' : 'Actions'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedCategories.length > 0 ? (
+                      paginatedCategories.map((row) => {
+                        const isExpanded = expandedRowIds.includes(String(row.id));
+                        const childSubs = categories.filter(
+                          (c) => String(c.parent_id) === String(row.id)
+                        );
+                        const parentObj = row.parent_id
+                          ? row.parent || categories.find((c) => String(c.id) === String(row.parent_id))
+                          : null;
+                        const rowTags = Array.isArray(row.tags) ? row.tags : [];
+
+                        return (
+                          <Fragment key={row.id}>
+                            {/* Primary Row (2-line structured cells) */}
+                            <tr className={`cat-primary-row ${isExpanded ? 'is-expanded' : ''} ${!row.is_active ? 'is-inactive' : ''}`}>
+                              {/* 1. Category Identity (Image + Icon + AR/EN Names + Storefront Slug Link) */}
+                              <td>
+                                <div className="cat-identity-cell">
+                                  <div className="cat-media-cluster" onClick={() => toggleExpandRow(row.id)}>
+                                    <div className="category-table-thumb-box" title={row.name_ar}>
+                                      {row.image_url ? (
+                                        <img
+                                          src={row.image_url}
+                                          alt={row.name_ar}
+                                          className="cat-thumb-img"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex';
+                                          }}
+                                        />
+                                      ) : null}
+                                      <div className="cat-thumb-placeholder" style={{ display: row.image_url ? 'none' : 'flex' }}>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
+                                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                          <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                      </div>
+                                    </div>
+                                    <div className="category-icon-badge" title={isRtl ? 'رمز القسم' : 'Category Icon'}>
+                                      {renderCategoryIcon(row.icon_url)}
+                                    </div>
+                                  </div>
+
+                                  <div className="cat-identity-lines">
+                                    <div className="line-1-titles">
+                                      <span className="name-ar" onClick={() => toggleExpandRow(row.id)}>
+                                        {row.name_ar}
+                                      </span>
+                                      <span className="cat-id-chip">#{row.id}</span>
+                                    </div>
+                                    <div className="line-2-meta">
+                                      <span className="name-en">{row.name_en}</span>
+                                      <span className="dot-sep">•</span>
+                                      <Link
+                                        href={`/categories/${encodeURIComponent(row.id)}/${encodeURIComponent(row.slug || row.id)}`}
+                                        target="_blank"
+                                        className="slug-store-link"
+                                        title={isRtl ? 'فتح صفحة القسم في المتجر' : 'Open in Store'}
+                                      >
+                                        <code>/{row.slug}</code>
+                                        <FaArrowUpRightFromSquare className="ext-ic" />
+                                      </Link>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* 2. Hierarchy Level & Subcategories Count (2 lines) */}
+                              <td>
+                                <div className="cat-hierarchy-cell">
+                                  {!row.parent_id ? (
+                                    <>
+                                      <span className="parent-pill main">
+                                        <FaStar className="star-ic" />
+                                        {isRtl ? 'قسم رئيسي (Root)' : 'Main Root'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className={`sub-branches-trigger ${childSubs.length > 0 ? 'has-subs' : ''}`}
+                                        onClick={() => toggleExpandRow(row.id)}
+                                      >
+                                        <FaLayerGroup />
+                                        <span>
+                                          {childSubs.length > 0
+                                            ? isRtl
+                                              ? `${childSubs.length} أقسام فرعية تابعة`
+                                              : `${childSubs.length} Subcategories`
+                                            : isRtl
+                                            ? 'بدون فروع تابعة'
+                                            : 'No subcategories'}
+                                        </span>
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="parent-pill sub">
+                                        {isRtl ? '↳ قسم فرعي (Level 2)' : '↳ Subcategory'}
+                                      </span>
+                                      <div className="parent-ref-line">
+                                        <span>{isRtl ? 'تابع لـ:' : 'Parent:'}</span>
+                                        <strong>{parentObj?.name_ar || parentObj?.name_en || `#${row.parent_id}`}</strong>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* 3. Pricing & Home Grid Display (2 lines) */}
+                              <td>
+                                <div className="cat-pricing-display-cell">
+                                  <div className="price-line">
+                                    <span className="lbl">{isRtl ? 'يبدأ من:' : 'From:'}</span>
+                                    {row.starting_price ? (
+                                      <strong className="price-val">
+                                        {Number(row.starting_price).toLocaleString()} <small>ج.م</small>
+                                      </strong>
+                                    ) : (
+                                      <span className="muted-dash">—</span>
+                                    )}
+                                  </div>
+                                  <div className="display-badges-line">
+                                    <span className={`home-grid-badge ${row.show_in_home_grid ? 'enabled' : 'disabled'}`}>
+                                      {row.show_in_home_grid ? (
+                                        <>
+                                          <FaCheck /> {isRtl ? 'بالرئيسية' : 'Home Grid'}
+                                        </>
+                                      ) : (
+                                        isRtl ? 'غير معروض بالهوم' : 'Hidden on Home'
+                                      )}
+                                    </span>
+                                    <span className="sort-badge" title={isRtl ? 'ترتيب الظهور' : 'Sort Order'}>
+                                      #{row.sort_order || 0}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* 4. Products Count & Auto-Linking Tags Preview (2 lines) */}
+                              <td>
+                                <div className="cat-products-tags-cell">
+                                  <div className="products-count-line">
+                                    <span className="prod-count-pill">
+                                      <FaBoxesStacked />
+                                      <strong>{row.products_count || 0}</strong>
+                                      <span>{isRtl ? 'منتج' : 'Products'}</span>
+                                    </span>
+                                    {rowTags.length > 0 && (
+                                      <span className="tags-count-hint">
+                                        ({rowTags.length} {isRtl ? 'وسم' : 'tags'})
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="tag-chips-preview" onClick={() => toggleExpandRow(row.id)}>
+                                    {rowTags.length > 0 ? (
+                                      <>
+                                        {rowTags.slice(0, 2).map((t, idx) => (
+                                          <span key={t.id || idx} className="rule-tag-chip" title={t.name_en}>
+                                            #{isRtl ? t.name_ar || t.name_en : t.name_en || t.name_ar}
+                                          </span>
+                                        ))}
+                                        {rowTags.length > 2 && (
+                                          <span className="more-tags-chip">+{rowTags.length - 2}</span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="no-tags">{isRtl ? 'بدون وسوم ربط' : 'No rule tags'}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* 5. Status */}
+                              <td>
+                                <AdminStatusBadge status={row.is_active ? 'ACTIVE' : 'INACTIVE'} lang={lang} />
+                              </td>
+
+                              {/* 6. Actions + Collapsible Drawer Trigger */}
+                              <td>
+                                <div className="action-buttons-group">
+                                  <Link
+                                    href={`/admin/categories/edit/${row.id}`}
+                                    className="btn-edit"
+                                    title={isRtl ? 'تعديل بيانات القسم' : 'Edit Category'}
+                                  >
+                                    <FaPenToSquare />
+                                    <span>{isRtl ? 'تعديل' : 'Edit'}</span>
+                                  </Link>
+
+                                  <button
+                                    type="button"
+                                    className={`btn-toggle ${row.is_active ? 'is-on' : 'is-off'}`}
+                                    onClick={() => handleToggleStatus(row)}
+                                    title={row.is_active ? (isRtl ? 'تعطيل القسم' : 'Disable') : (isRtl ? 'تفعيل القسم' : 'Enable')}
+                                  >
+                                    <FaPowerOff />
+                                    <span>{row.is_active ? (isRtl ? 'تعطيل' : 'Disable') : (isRtl ? 'تفعيل' : 'Enable')}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="btn-delete"
+                                    onClick={() => setCategoryToDelete(row)}
+                                    title={isRtl ? 'حذف القسم' : 'Delete'}
+                                  >
+                                    <FaTrashCan />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className={`btn-expand-row ${isExpanded ? 'expanded' : ''}`}
+                                    onClick={() => toggleExpandRow(row.id)}
+                                    title={isRtl ? 'عرض / إخفاء التفاصيل الكاملة' : 'Toggle Full Details'}
+                                  >
+                                    {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Secondary Collapsible Details Row */}
+                            {isExpanded && (
+                              <tr className="cat-detail-drawer-row">
+                                <td colSpan={6}>
+                                  <div className="cat-collapsible-panel">
+                                    {/* Column 1: SEO & Metadata */}
+                                    <div className="drawer-section seo-meta-box">
+                                      <div className="drawer-sec-head">
+                                        <FaFolder className="sec-ic" />
+                                        <h4>{isRtl ? 'بيانات الوصف والـ SEO والروابط' : 'SEO Descriptions & URL'}</h4>
+                                      </div>
+                                      <div className="seo-descriptions-grid">
+                                        <div className="desc-item">
+                                          <span className="desc-lbl">{isRtl ? 'الوصف بالعربية:' : 'Arabic SEO:'}</span>
+                                          <p>{row.description_ar || (isRtl ? 'لا يوجد وصف عربي مسجل لهذا القسم.' : 'No Arabic description.')}</p>
+                                        </div>
+                                        <div className="desc-item">
+                                          <span className="desc-lbl">{isRtl ? 'الوصف بالإنجليزية:' : 'English SEO:'}</span>
+                                          <p dir="ltr">{row.description_en || 'No English description provided.'}</p>
+                                        </div>
+                                      </div>
+                                      <div className="drawer-quick-links">
+                                        <Link
+                                          href={`/categories/${encodeURIComponent(row.id)}/${encodeURIComponent(row.slug || row.id)}`}
+                                          target="_blank"
+                                          className="store-preview-pill"
+                                        >
+                                          <FaArrowUpRightFromSquare />
+                                          <span>{isRtl ? 'معاينة القسم في المتجر' : 'View in Store'}</span>
+                                          <code>/categories/{row.id}/{row.slug}</code>
+                                        </Link>
+                                      </div>
+                                    </div>
+
+                                    {/* Column 2: All Auto-Linking Rule Tags */}
+                                    <div className="drawer-section tags-full-box">
+                                      <div className="drawer-sec-head">
+                                        <FaTag className="sec-ic purple" />
+                                        <h4>
+                                          {isRtl ? 'وسوم الربط التلقائي (Hybrid Rules)' : 'Auto-Linking Tags'}
+                                          <span className="sec-count">{rowTags.length}</span>
+                                        </h4>
+                                      </div>
+                                      {rowTags.length > 0 ? (
+                                        <div className="drawer-tags-cloud">
+                                          {rowTags.map((t, idx) => (
+                                            <span key={t.id || idx} className="drawer-tag-pill">
+                                              <strong>#{t.name_ar || t.name_en}</strong>
+                                              {t.name_en && t.name_ar && <small>({t.name_en})</small>}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="drawer-empty-note">
+                                          {isRtl
+                                            ? 'لا توجد وسوم مربوطة بهذا القسم حالياً. يمكنك إضافة وسوم من صفحة تعديل القسم.'
+                                            : 'No rule tags linked to this category yet.'}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Column 3: Subcategories or Parent Info */}
+                                    <div className="drawer-section hierarchy-full-box">
+                                      <div className="drawer-sec-head">
+                                        <FaFolderTree className="sec-ic teal" />
+                                        <h4>
+                                          {!row.parent_id
+                                            ? isRtl
+                                              ? 'الأقسام الفرعية التابعة'
+                                              : 'Nested Subcategories'
+                                            : isRtl
+                                            ? 'بيانات القسم الرئيسي الأب'
+                                            : 'Parent Category Info'}
+                                          {!row.parent_id && <span className="sec-count">{childSubs.length}</span>}
+                                        </h4>
+                                      </div>
+
+                                      {!row.parent_id ? (
+                                        childSubs.length > 0 ? (
+                                          <div className="drawer-subs-grid">
+                                            {childSubs.map((sub) => (
+                                              <div key={sub.id} className="drawer-sub-mini-card">
+                                                <div className="sub-mini-info">
+                                                  <div className="sub-mini-icon">
+                                                    {renderCategoryIcon(sub.icon_url)}
+                                                  </div>
+                                                  <div className="sub-mini-text">
+                                                    <strong>{sub.name_ar}</strong>
+                                                    <span>/{sub.slug}</span>
+                                                  </div>
+                                                </div>
+                                                <div className="sub-mini-actions">
+                                                  {sub.starting_price && (
+                                                    <span className="sub-price-tag">
+                                                      {Number(sub.starting_price).toLocaleString()} ج.م
+                                                    </span>
+                                                  )}
+                                                  <Link
+                                                    href={`/admin/categories/edit/${sub.id}`}
+                                                    className="sub-mini-edit-btn"
+                                                    title={isRtl ? 'تعديل القسم الفرعي' : 'Edit Subcategory'}
+                                                  >
+                                                    <FaPenToSquare />
+                                                    <span>{isRtl ? 'تعديل' : 'Edit'}</span>
+                                                  </Link>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="drawer-empty-note">
+                                            <span>{isRtl ? 'لا توجد أقسام فرعية تابعة لهذا القسم الرئيسي.' : 'No subcategories yet.'}</span>
+                                            <Link href={`/admin/categories/edit/${row.id}`} className="add-sub-inline-link">
+                                              {isRtl ? '+ إضافة فروع لهذا القسم' : '+ Add Subcategories'}
+                                            </Link>
+                                          </div>
+                                        )
+                                      ) : parentObj ? (
+                                        <div className="drawer-sub-mini-card parent-highlight">
+                                          <div className="sub-mini-info">
+                                            <div className="sub-mini-icon">
+                                              {renderCategoryIcon(parentObj.icon_url)}
+                                            </div>
+                                            <div className="sub-mini-text">
+                                              <strong>⭐ {parentObj.name_ar}</strong>
+                                              <span>/{parentObj.slug}</span>
+                                            </div>
+                                          </div>
+                                          <Link
+                                            href={`/admin/categories/edit/${parentObj.id}`}
+                                            className="sub-mini-edit-btn"
+                                          >
+                                            <FaPenToSquare />
+                                            <span>{isRtl ? 'تعديل الأب' : 'Edit Parent'}</span>
+                                          </Link>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={6}>
+                          <div className="smart-table-empty">
+                            <FaFolderTree className="empty-ic" />
+                            <h4>{isRtl ? 'لا توجد أقسام مطابقة للبحث' : 'No matching categories found'}</h4>
+                            <p>{isRtl ? 'جرّب تغيير كلمات البحث أو الفلتر المختار أعلاه' : 'Try adjusting your search or filter criteria'}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Footer */}
+              {totalPages > 1 && (
+                <div className="smart-table-pagination">
+                  <div className="page-info">
+                    {isRtl
+                      ? `عرض ${(currentPage - 1) * itemsPerPage + 1} إلى ${Math.min(currentPage * itemsPerPage, filteredCategories.length)} من أصل ${filteredCategories.length} قسم`
+                      : `Showing ${(currentPage - 1) * itemsPerPage + 1} to ${Math.min(currentPage * itemsPerPage, filteredCategories.length)} of ${filteredCategories.length}`}
+                  </div>
+                  <div className="page-buttons">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    >
+                      {isRtl ? 'السابق' : 'Prev'}
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        type="button"
+                        className={currentPage === page ? 'active' : ''}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      {isRtl ? 'التالي' : 'Next'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="categories-tree-container">
-              {mainCategoriesWithSubs.map((main) => (
-                <div key={main.id} className="tree-main-category">
-                  <div className="tree-parent-row">
-                    <div className="parent-info">
-                      <div className="category-name-cell">
-                        {main.image_url && (
-                          <div className="tree-thumb-box" title={main.name_ar}>
-                            <img src={main.image_url} alt={main.name_ar} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                          </div>
+              {mainCategoriesWithSubs.map((main) => {
+                const isTreeCollapsed = collapsedTreeIds.includes(String(main.id));
+                return (
+                  <div key={main.id} className="tree-main-category">
+                    <div className="tree-parent-row">
+                      <div className="parent-info">
+                        {main.subs && main.subs.length > 0 && (
+                          <button
+                            type="button"
+                            className={`tree-collapse-btn ${isTreeCollapsed ? 'collapsed' : ''}`}
+                            onClick={() => toggleTreeBranch(main.id)}
+                            title={isRtl ? 'طي / توسيع الفروع' : 'Toggle Subcategories'}
+                          >
+                            {isTreeCollapsed ? <FaChevronDown /> : <FaChevronUp />}
+                          </button>
                         )}
-                        <div className="category-icon-box" title={isRtl ? 'أيقونة القسم' : 'Category Icon'}>
-                          {renderCategoryIcon(main.icon_url)}
+                        <div className="category-name-cell">
+                          {main.image_url && (
+                            <div className="tree-thumb-box" title={main.name_ar}>
+                              <img src={main.image_url} alt={main.name_ar} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            </div>
+                          )}
+                          <div className="category-icon-box" title={isRtl ? 'أيقونة القسم' : 'Category Icon'}>
+                            {renderCategoryIcon(main.icon_url)}
+                          </div>
+                          <div className="category-name-meta">
+                            <span className="name-ar">⭐ {main.name_ar}</span>
+                            <span className="name-en">{main.name_en} (/{main.slug})</span>
+                          </div>
                         </div>
-                        <div className="category-name-meta">
-                          <span className="name-ar">⭐ {main.name_ar}</span>
-                          <span className="name-en">{main.name_en} ({main.slug})</span>
-                        </div>
+                        <span className="parent-pill main">
+                          {isRtl ? `قسم رئيسي (${main.subs?.length || 0} فروع)` : `Root (${main.subs?.length || 0})`}
+                        </span>
+                        <AdminStatusBadge status={main.is_active ? 'ACTIVE' : 'INACTIVE'} lang={lang} />
                       </div>
-                      <span className="parent-pill main">{isRtl ? 'قسم رئيسي' : 'Root'}</span>
-                      <AdminStatusBadge status={main.is_active ? 'ACTIVE' : 'INACTIVE'} lang={lang} />
+
+                      <div className="action-buttons-group">
+                        <Link href={`/admin/categories/edit/${main.id}`} className="btn-edit">
+                          <FaPenToSquare />
+                          <span>{isRtl ? 'تعديل' : 'Edit'}</span>
+                        </Link>
+                        <button type="button" className="btn-toggle" onClick={() => handleToggleStatus(main)}>
+                          <FaPowerOff />
+                          <span>{main.is_active ? (isRtl ? 'تعطيل' : 'Disable') : (isRtl ? 'تفعيل' : 'Enable')}</span>
+                        </button>
+                        <button type="button" className="btn-delete" onClick={() => setCategoryToDelete(main)}>
+                          <FaTrashCan />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="action-buttons-group">
-                      <Link href={`/admin/categories/edit/${main.id}`} className="btn-edit" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isRtl ? 'تعديل' : 'Edit'}
-                      </Link>
-                      <button type="button" className="btn-toggle" onClick={() => handleToggleStatus(main)}>
-                        {main.is_active ? (isRtl ? 'تعطيل' : 'Disable') : (isRtl ? 'تفعيل' : 'Enable')}
-                      </button>
-                      <button type="button" className="btn-delete" onClick={() => setCategoryToDelete(main)}>
-                        {isRtl ? 'حذف' : 'Delete'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {main.subs && main.subs.length > 0 && (
-                    <div className="tree-subcategories-list">
-                      {main.subs.map((sub) => (
-                        <div key={sub.id} className="tree-sub-row">
-                          <div className="category-name-cell">
-                            <span style={{ color: '#94a3b8' }}>↳</span>
-                            {sub.image_url && (
-                              <div className="tree-thumb-box" title={sub.name_ar}>
-                                <img src={sub.image_url} alt={sub.name_ar} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    {main.subs && main.subs.length > 0 && !isTreeCollapsed && (
+                      <div className="tree-subcategories-list">
+                        {main.subs.map((sub) => (
+                          <div key={sub.id} className="tree-sub-row">
+                            <div className="category-name-cell">
+                              <span style={{ color: '#94a3b8', fontWeight: 800 }}>↳</span>
+                              {sub.image_url && (
+                                <div className="tree-thumb-box" title={sub.name_ar}>
+                                  <img src={sub.image_url} alt={sub.name_ar} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                </div>
+                              )}
+                              <div className="category-icon-box small" title={isRtl ? 'أيقونة الفرع' : 'Sub Icon'}>
+                                {renderCategoryIcon(sub.icon_url)}
                               </div>
-                            )}
-                            <div className="category-icon-box small" title={isRtl ? 'أيقونة الفرع' : 'Sub Icon'}>
-                              {renderCategoryIcon(sub.icon_url)}
+                              <div className="category-name-meta">
+                                <span className="name-ar">{sub.name_ar}</span>
+                                <span className="name-en">{sub.name_en} (/{sub.slug})</span>
+                              </div>
+                              <AdminStatusBadge status={sub.is_active ? 'ACTIVE' : 'INACTIVE'} lang={lang} />
                             </div>
-                            <div className="category-name-meta">
-                              <span className="name-ar">{sub.name_ar}</span>
-                              <span className="name-en">{sub.name_en} ({sub.slug})</span>
-                            </div>
-                            <AdminStatusBadge status={sub.is_active ? 'ACTIVE' : 'INACTIVE'} lang={lang} />
-                          </div>
 
-                          <div className="action-buttons-group">
-                            <Link href={`/admin/categories/edit/${sub.id}`} className="btn-edit" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {isRtl ? 'تعديل' : 'Edit'}
-                            </Link>
-                            <button type="button" className="btn-toggle" onClick={() => handleToggleStatus(sub)}>
-                              {sub.is_active ? (isRtl ? 'تعطيل' : 'Disable') : (isRtl ? 'تفعيل' : 'Enable')}
-                            </button>
-                            <button type="button" className="btn-delete" onClick={() => setCategoryToDelete(sub)}>
-                              {isRtl ? 'حذف' : 'Delete'}
-                            </button>
+                            <div className="action-buttons-group">
+                              <Link href={`/admin/categories/edit/${sub.id}`} className="btn-edit">
+                                <FaPenToSquare />
+                                <span>{isRtl ? 'تعديل' : 'Edit'}</span>
+                              </Link>
+                              <button type="button" className="btn-toggle" onClick={() => handleToggleStatus(sub)}>
+                                <FaPowerOff />
+                                <span>{sub.is_active ? (isRtl ? 'تعطيل' : 'Disable') : (isRtl ? 'تفعيل' : 'Enable')}</span>
+                              </button>
+                              <button type="button" className="btn-delete" onClick={() => setCategoryToDelete(sub)}>
+                                <FaTrashCan />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </main>

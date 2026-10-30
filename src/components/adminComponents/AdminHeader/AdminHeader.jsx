@@ -17,10 +17,15 @@ export default function AdminHeader({
 
   const handleLogout = async () => {
     try {
-      // Clear client session cookie
+      // Clear client session cookies & localStorage tokens
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       document.cookie = 'trendline_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       document.cookie = 'next-auth.session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       document.cookie = '__Secure-next-auth.session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('trendline_admin_token');
+        localStorage.removeItem('trendline_admin_user');
+      }
       
       // Call backend logout endpoint if available
       try {

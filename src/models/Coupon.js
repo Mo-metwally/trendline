@@ -12,6 +12,16 @@ const Coupon = sequelize.define('Coupon', {
     allowNull: false,
     unique: true,
   },
+  name_ar: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+    comment: 'Coupon title/name in Arabic',
+  },
+  name_en: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+    comment: 'Coupon title/name in English',
+  },
   description_ar: {
     type: DataTypes.STRING(255),
     allowNull: true,
@@ -46,6 +56,13 @@ const Coupon = sequelize.define('Coupon', {
   usage_limit: {
     type: DataTypes.INTEGER,
     allowNull: true,
+    comment: 'Total general usage limit across all orders',
+  },
+  per_user_limit: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 1,
+    comment: 'Max usage limit per customer (verified by customer_phone in orders)',
   },
   used_count: {
     type: DataTypes.INTEGER,

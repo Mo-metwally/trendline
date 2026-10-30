@@ -3,9 +3,9 @@ const { sequelize } = require('../config/db');
 
 const Bundle = sequelize.define('Bundle', {
   id: {
-    type: DataTypes.BIGINT,
+    type: DataTypes.STRING(50),
     primaryKey: true,
-    autoIncrement: true,
+    allowNull: false,
   },
   name_ar: {
     type: DataTypes.STRING(255),
@@ -35,15 +35,17 @@ const Bundle = sequelize.define('Bundle', {
   },
   image_url: {
     type: DataTypes.STRING(500),
-    allowNull: false,
+    allowNull: true,
   },
   original_total_price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
+    defaultValue: 0,
   },
   bundle_price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
+    defaultValue: 0,
   },
   discount_percent: {
     type: DataTypes.SMALLINT,

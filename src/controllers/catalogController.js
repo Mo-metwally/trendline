@@ -15,10 +15,108 @@ const {
 } = require('../models');
 const AutoCategorizationService = require('../services/autoCategorizationService');
 const BundleService = require('../services/bundleService');
-const { generateCategoryId, generateProductId } = require('../utils/idGenerator');
+const {
+  generateCategoryId,
+  generateProductId,
+  generateBundleId,
+  generateProductSku,
+  generateProductBarcodeEAN13,
+  calculateEAN13CheckDigit,
+} = require('../utils/idGenerator');
 
 class CatalogController {
   // =================== PRODUCTS ===================
+
+  /**
+   * Auto-generate unique Product SKU & EAN-13 Barcode
+   * GET /api/v1/catalog/products/generate-codes
+   */
+  static async generateProductCodes(req, res, next) {
+    try {
+      const { category_id, category_code } = req.query;
+      let catCode = category_code || 'GEN';
+      if (category_id && !category_code) {
+        const cat = await Category.findByPk(category_id, { attributes: ['slug', 'id'] });
+        if (cat?.slug) {
+          catCode = cat.slug.slice(0, 4).toUpperCase();
+        }
+      }
+
+      const sku = await generateProductSku({ Product }, catCode);
+      const barcode = await generateProductBarcodeEAN13({ Product });
+
+      return res.json({
+        success: true,
+        data: {
+          sku,
+          barcode,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Live uniqueness validator for SKU, Barcode, Slug, Name AR, Name EN
+   * GET /api/v1/catalog/products/check-unique
+   */
+  static async checkProductUnique(req, res, next) {
+    try {
+      const { sku, barcode, slug, name_ar, name_en, exclude_id } = req.query;
+      const conflicts = {};
+      const baseWhere = exclude_id ? { id: { [Op.ne]: exclude_id } } : {};
+
+      if (sku && sku.trim()) {
+        const existsSku = await Product.findOne({
+          where: { ...baseWhere, sku: sku.trim() },
+          attributes: ['id', 'name_ar', 'name_en'],
+        });
+        if (existsSku) conflicts.sku = 'رمز SKU التعريفي مسجل مسبقاً لمنتج آخر';
+      }
+
+      if (barcode && barcode.trim()) {
+        const existsBarcode = await Product.findOne({
+          where: { ...baseWhere, barcode: barcode.trim() },
+          attributes: ['id', 'name_ar', 'name_en'],
+        });
+        if (existsBarcode) conflicts.barcode = 'الباركود الدولي (EAN-13) مسجل مسبقاً لمنتج آخر';
+      }
+
+      if (slug && slug.trim()) {
+        const existsSlug = await Product.findOne({
+          where: { ...baseWhere, slug: slug.trim() },
+          attributes: ['id'],
+        });
+        if (existsSlug) conflicts.slug = 'الرابط الدائم (Slug) مستخدم بالفعل لمنتج آخر';
+      }
+
+      if (name_ar && name_ar.trim()) {
+        const existsNameAr = await Product.findOne({
+          where: { ...baseWhere, name_ar: name_ar.trim() },
+          attributes: ['id'],
+        });
+        if (existsNameAr) conflicts.name_ar = 'اسم المنتج بالعربية مسجل بالفعل لمنتج آخر';
+      }
+
+      if (name_en && name_en.trim()) {
+        const existsNameEn = await Product.findOne({
+          where: { ...baseWhere, name_en: name_en.trim() },
+          attributes: ['id'],
+        });
+        if (existsNameEn) conflicts.name_en = 'اسم المنتج بالإنجليزية مسجل بالفعل لمنتج آخر';
+      }
+
+      const isUnique = Object.keys(conflicts).length === 0;
+      return res.json({
+        success: true,
+        isUnique,
+        conflicts,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 
   /**
    * List Products with Filtering, Search & Pagination
@@ -36,12 +134,14 @@ class CatalogController {
         min_price,
         max_price,
         in_stock_only,
+        on_sale_only,
         page = 1,
-        limit = 20,
+        limit = 12,
         sort = 'created_at_desc',
       } = req.query;
 
       const whereClause = {};
+      const andConditions = [];
 
       // Filter by is_active status: 'true', 'false', or 'all'
       if (is_active !== undefined && is_active !== 'all') {
@@ -69,30 +169,77 @@ class CatalogController {
       if (brand_id && brand_id !== 'all') whereClause.brand_id = brand_id;
       if (is_featured !== undefined && is_featured !== 'all') whereClause.is_featured = is_featured === 'true';
 
-      // Price filter
-      if (min_price || max_price) {
-        whereClause.original_price = {};
-        if (min_price) whereClause.original_price[Op.gte] = Number(min_price);
-        if (max_price) whereClause.original_price[Op.lte] = Number(max_price);
+      // Effective Price filter (COALESCE(sale_price, original_price))
+      if (min_price !== undefined && min_price !== '' && !Number.isNaN(Number(min_price))) {
+        andConditions.push(
+          sequelize.literal(`COALESCE("Product"."sale_price", "Product"."original_price") >= ${Number(min_price)}`)
+        );
+      }
+      if (max_price !== undefined && max_price !== '' && !Number.isNaN(Number(max_price))) {
+        andConditions.push(
+          sequelize.literal(`COALESCE("Product"."sale_price", "Product"."original_price") <= ${Number(max_price)}`)
+        );
       }
 
       // Stock status filter
       if (stock_status === 'in_stock') {
-        whereClause[Op.and] = sequelize.literal('products.stock_quantity > products.low_stock_threshold');
+        andConditions.push(sequelize.literal('"Product"."stock_quantity" > "Product"."low_stock_threshold"'));
       } else if (stock_status === 'low_stock') {
-        whereClause[Op.and] = sequelize.literal('products.stock_quantity > 0 AND products.stock_quantity <= products.low_stock_threshold');
+        andConditions.push(
+          sequelize.literal('"Product"."stock_quantity" > 0 AND "Product"."stock_quantity" <= "Product"."low_stock_threshold"')
+        );
       } else if (stock_status === 'out_of_stock') {
         whereClause.stock_quantity = 0;
       } else if (in_stock_only === 'true') {
-        whereClause[Op.and] = sequelize.literal('products.stock_quantity - products.reserved_stock > 0');
+        andConditions.push(sequelize.literal('("Product"."stock_quantity" - "Product"."reserved_stock") > 0'));
+      }
+
+      // On sale / discounted filter
+      if (on_sale_only === 'true') {
+        andConditions.push(
+          sequelize.literal(
+            '(("Product"."sale_price" IS NOT NULL AND "Product"."sale_price" > 0 AND "Product"."sale_price" < "Product"."original_price") OR "Product"."discount_percent" > 0)'
+          )
+        );
+      }
+
+      // Category filter (supports root category + its subcategories safely with pagination)
+      if (category_id && category_id !== 'all') {
+        const targetCat = await Category.findOne({
+          where: {
+            [Op.or]: [
+              { id: String(category_id) },
+              { slug: String(category_id) },
+            ],
+          },
+          include: [{ model: Category, as: 'subcategories', attributes: ['id'] }],
+        });
+
+        const matchingCatIds = targetCat
+          ? [targetCat.id, ...(targetCat.subcategories || []).map((s) => s.id)]
+          : [String(category_id)];
+
+        const prodCatLinks = await ProductCategory.findAll({
+          where: { category_id: { [Op.in]: matchingCatIds } },
+          attributes: ['product_id'],
+          raw: true,
+        });
+
+        const matchingProductIds = [...new Set(prodCatLinks.map((row) => row.product_id))];
+        whereClause.id = { [Op.in]: matchingProductIds.length > 0 ? matchingProductIds : ['__NONE__'] };
+      }
+
+      if (andConditions.length > 0) {
+        whereClause[Op.and] = andConditions;
       }
 
       // Comprehensive Sorting
       let order = [['created_at', 'DESC']];
       if (sort === 'created_at_desc') order = [['created_at', 'DESC']];
       if (sort === 'created_at_asc') order = [['created_at', 'ASC']];
-      if (sort === 'price_asc') order = [['original_price', 'ASC']];
-      if (sort === 'price_desc') order = [['original_price', 'DESC']];
+      if (sort === 'price_asc') order = [[sequelize.literal('COALESCE("Product"."sale_price", "Product"."original_price")'), 'ASC']];
+      if (sort === 'price_desc') order = [[sequelize.literal('COALESCE("Product"."sale_price", "Product"."original_price")'), 'DESC']];
+      if (sort === 'discount_desc') order = [['discount_percent', 'DESC']];
       if (sort === 'stock_desc') order = [['stock_quantity', 'DESC']];
       if (sort === 'stock_asc') order = [['stock_quantity', 'ASC']];
       if (sort === 'rating') order = [['rating_avg', 'DESC']];
@@ -103,32 +250,23 @@ class CatalogController {
         { model: Brand, as: 'brand', attributes: ['id', 'name_ar', 'name_en', 'slug', 'logo_url'] },
         { model: ProductImage, as: 'images', attributes: ['id', 'image_url', 'alt_text_ar', 'alt_text_en', 'is_primary', 'sort_order'] },
         { model: Tag, as: 'tags', attributes: ['id', 'name_ar', 'name_en', 'slug'], through: { attributes: [] } },
+        {
+          model: Category,
+          as: 'categories',
+          attributes: ['id', 'name_ar', 'name_en', 'slug', 'parent_id'],
+          through: { attributes: ['is_primary', 'is_auto_assigned'] },
+        },
       ];
 
-      // Join Category if specified
-      if (category_id) {
-        include.push({
-          model: Category,
-          as: 'categories',
-          where: { id: category_id },
-          attributes: ['id', 'name_ar', 'name_en', 'slug'],
-          through: { attributes: [] },
-        });
-      } else {
-        include.push({
-          model: Category,
-          as: 'categories',
-          attributes: ['id', 'name_ar', 'name_en', 'slug'],
-          through: { attributes: ['is_primary', 'is_auto_assigned'] },
-        });
-      }
+      const safePage = Math.max(1, Number(page) || 1);
+      const safeLimit = Math.max(1, Math.min(200, Number(limit) || 12));
+      const offset = (safePage - 1) * safeLimit;
 
-      const offset = (Number(page) - 1) * Number(limit);
       const { count, rows } = await Product.findAndCountAll({
         where: whereClause,
         include,
         order,
-        limit: Number(limit),
+        limit: safeLimit,
         offset,
         distinct: true,
       });
@@ -138,8 +276,9 @@ class CatalogController {
       return res.status(200).json({
         success: true,
         count,
-        page: Number(page),
-        total_pages: Math.ceil(count / limit),
+        page: safePage,
+        limit: safeLimit,
+        total_pages: Math.max(1, Math.ceil(count / safeLimit)),
         data: localizedRows,
       });
     } catch (error) {
@@ -164,7 +303,14 @@ class CatalogController {
         },
         include: [
           { model: Brand, as: 'brand' },
-          { model: Category, as: 'categories', through: { attributes: ['is_primary', 'is_auto_assigned'] } },
+          {
+            model: Category,
+            as: 'categories',
+            through: { attributes: ['is_primary', 'is_auto_assigned'] },
+            include: [
+              { model: Category, as: 'parent', attributes: ['id', 'name_ar', 'name_en', 'slug'] },
+            ],
+          },
           { model: Tag, as: 'tags', through: { attributes: [] } },
           { model: ProductImage, as: 'images' },
           {
@@ -180,9 +326,18 @@ class CatalogController {
         return res.status(404).json({ success: false, message: 'Product not found' });
       }
 
+      const localized = res.localize(product);
+      if (Array.isArray(localized.images)) {
+        localized.images.sort((a, b) => {
+          if (a.is_primary && !b.is_primary) return -1;
+          if (!a.is_primary && b.is_primary) return 1;
+          return (a.sort_order || 0) - (b.sort_order || 0);
+        });
+      }
+
       return res.status(200).json({
         success: true,
-        data: res.localize(product),
+        data: localized,
       });
     } catch (error) {
       next(error);
@@ -209,6 +364,7 @@ class CatalogController {
         description_ar,
         description_en,
         specifications,
+        showcase_tabs,
         cost_price,
         original_price,
         sale_price,
@@ -244,6 +400,103 @@ class CatalogController {
         discount_percent = Math.round(((original_price - sale_price) / original_price) * 100);
       }
 
+      // ================= UNICITY VALIDATION & AUTO-GENERATION =================
+      // 1. Validate name_ar uniqueness
+      if (name_ar && name_ar.trim()) {
+        const dupNameAr = await Product.findOne({
+          where: { name_ar: name_ar.trim() },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupNameAr) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'name_ar',
+            message: `اسم المنتج بالعربية "${name_ar.trim()}" مسجل مسبقاً لمنتج آخر! يرجى اختيار اسم غير مكرر.`,
+          });
+        }
+      }
+
+      // 2. Validate name_en uniqueness
+      if (name_en && name_en.trim()) {
+        const dupNameEn = await Product.findOne({
+          where: { name_en: name_en.trim() },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupNameEn) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'name_en',
+            message: `اسم المنتج بالإنجليزية "${name_en.trim()}" مسجل مسبقاً لمنتج آخر (English name already exists)!`,
+          });
+        }
+      }
+
+      // 3. Validate slug uniqueness
+      if (slug && slug.trim()) {
+        const dupSlug = await Product.findOne({
+          where: { slug: slug.trim() },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupSlug) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'slug',
+            message: `الرابط الدائم (Slug) "${slug.trim()}" مستخدم بالفعل لمنتج آخر!`,
+          });
+        }
+      }
+
+      // 4. SKU: Auto-generate if empty, otherwise validate uniqueness
+      let finalSku = sku && sku.trim() ? sku.trim() : '';
+      if (!finalSku) {
+        let catCode = 'GEN';
+        if (activePrimaryId) {
+          const primCat = await Category.findByPk(activePrimaryId, { attributes: ['slug'], transaction: t });
+          if (primCat?.slug) catCode = primCat.slug.slice(0, 4).toUpperCase();
+        }
+        finalSku = await generateProductSku({ Product }, catCode, t);
+      } else {
+        const dupSku = await Product.findOne({
+          where: { sku: finalSku },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupSku) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'sku',
+            message: `رمز SKU التعريفي "${finalSku}" مسجل مسبقاً لمنتج آخر! يجب أن يكون كود SKU فريداً تماماً.`,
+          });
+        }
+      }
+
+      // 5. Barcode (EAN-13): Auto-generate if empty, otherwise validate uniqueness
+      let finalBarcode = barcode && barcode.trim() ? barcode.trim() : '';
+      if (!finalBarcode) {
+        finalBarcode = await generateProductBarcodeEAN13({ Product }, t);
+      } else {
+        const dupBarcode = await Product.findOne({
+          where: { barcode: finalBarcode },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupBarcode) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'barcode',
+            message: `الباركود الدولي (EAN-13) "${finalBarcode}" مسجل مسبقاً لمنتج آخر! يجب أن يكون الباركود فريداً تماماً.`,
+          });
+        }
+      }
+
       const generatedId = await generateProductId({ Product }, t);
 
       const product = await Product.create({
@@ -252,13 +505,14 @@ class CatalogController {
         name_ar,
         name_en,
         slug,
-        sku,
-        barcode: barcode || null,
+        sku: finalSku,
+        barcode: finalBarcode,
         short_desc_ar: short_desc_ar || null,
         short_desc_en: short_desc_en || null,
         description_ar: description_ar || null,
         description_en: description_en || null,
         specifications: specifications || null,
+        showcase_tabs: showcase_tabs || null,
         video_urls: Array.isArray(video_urls) ? video_urls : [],
         cost_price: cost_price || 0.00,
         original_price,
@@ -327,6 +581,304 @@ class CatalogController {
         success: true,
         message: 'Product created and auto-categorized successfully',
         data: created,
+      });
+    } catch (error) {
+      await t.rollback();
+      next(error);
+    }
+  }
+
+  /**
+   * Update Existing Product (Admin & ERP Full Edit)
+   * PUT /api/v1/catalog/products/:id
+   */
+  static async updateProduct(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+      const { id } = req.params;
+      const product = await Product.findByPk(id, { transaction: t });
+
+      if (!product) {
+        await t.rollback();
+        return res.status(404).json({
+          success: false,
+          message: 'المنتج غير موجود (Product not found)',
+        });
+      }
+
+      const {
+        brand_id,
+        name_ar,
+        name_en,
+        slug,
+        sku,
+        barcode,
+        short_desc_ar,
+        short_desc_en,
+        description_ar,
+        description_en,
+        specifications,
+        showcase_tabs,
+        cost_price,
+        original_price,
+        sale_price,
+        sale_ends_at,
+        stock_quantity,
+        low_stock_threshold = 5,
+        is_featured,
+        is_active,
+        category_ids = [],
+        primary_category_id,
+        tag_ids = [],
+        image_urls,
+        video_urls,
+      } = req.body;
+
+      const allCategoryIds =
+        Array.isArray(category_ids) && category_ids.length > 0
+          ? [...new Set(category_ids.map(String))]
+          : primary_category_id
+            ? [String(primary_category_id)]
+            : [];
+
+      if (allCategoryIds.length === 0) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'يجب اختيار قسم واحد على الأقل للمنتج (Category is required)',
+        });
+      }
+
+      const activePrimaryId = String(primary_category_id || allCategoryIds[0]);
+
+      let discount_percent = 0;
+      const effectiveOriginal =
+        original_price !== undefined ? Number(original_price) : Number(product.original_price);
+      const effectiveSale =
+        sale_price !== undefined ? (sale_price ? Number(sale_price) : null) : product.sale_price;
+
+      if (effectiveSale && effectiveOriginal && effectiveOriginal > effectiveSale) {
+        discount_percent = Math.round(((effectiveOriginal - effectiveSale) / effectiveOriginal) * 100);
+      }
+
+      // ================= UNICITY VALIDATION FOR UPDATE =================
+      if (name_ar && name_ar.trim() && name_ar.trim() !== product.name_ar) {
+        const dupNameAr = await Product.findOne({
+          where: { id: { [Op.ne]: id }, name_ar: name_ar.trim() },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupNameAr) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'name_ar',
+            message: `اسم المنتج بالعربية "${name_ar.trim()}" مسجل مسبقاً لمنتج آخر!`,
+          });
+        }
+      }
+
+      if (name_en && name_en.trim() && name_en.trim() !== product.name_en) {
+        const dupNameEn = await Product.findOne({
+          where: { id: { [Op.ne]: id }, name_en: name_en.trim() },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupNameEn) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'name_en',
+            message: `اسم المنتج بالإنجليزية "${name_en.trim()}" مسجل مسبقاً لمنتج آخر!`,
+          });
+        }
+      }
+
+      if (slug && slug.trim() && slug.trim() !== product.slug) {
+        const dupSlug = await Product.findOne({
+          where: { id: { [Op.ne]: id }, slug: slug.trim() },
+          attributes: ['id'],
+          transaction: t,
+        });
+        if (dupSlug) {
+          await t.rollback();
+          return res.status(409).json({
+            success: false,
+            field: 'slug',
+            message: `الرابط الدائم (Slug) "${slug.trim()}" مستخدم بالفعل لمنتج آخر!`,
+          });
+        }
+      }
+
+      let updatedSku = product.sku;
+      if (sku !== undefined) {
+        const cleanSku = sku ? sku.trim() : '';
+        if (cleanSku && cleanSku !== product.sku) {
+          const dupSku = await Product.findOne({
+            where: { id: { [Op.ne]: id }, sku: cleanSku },
+            attributes: ['id'],
+            transaction: t,
+          });
+          if (dupSku) {
+            await t.rollback();
+            return res.status(409).json({
+              success: false,
+              field: 'sku',
+              message: `رمز SKU التعريفي "${cleanSku}" مسجل مسبقاً لمنتج آخر!`,
+            });
+          }
+          updatedSku = cleanSku;
+        } else if (!cleanSku) {
+          updatedSku = await generateProductSku({ Product }, 'GEN', t);
+        }
+      }
+
+      let updatedBarcode = product.barcode;
+      if (barcode !== undefined) {
+        const cleanBarcode = barcode ? barcode.trim() : '';
+        if (cleanBarcode && cleanBarcode !== product.barcode) {
+          const dupBarcode = await Product.findOne({
+            where: { id: { [Op.ne]: id }, barcode: cleanBarcode },
+            attributes: ['id'],
+            transaction: t,
+          });
+          if (dupBarcode) {
+            await t.rollback();
+            return res.status(409).json({
+              success: false,
+              field: 'barcode',
+              message: `الباركود الدولي "${cleanBarcode}" مسجل مسبقاً لمنتج آخر!`,
+            });
+          }
+          updatedBarcode = cleanBarcode;
+        } else if (!cleanBarcode) {
+          updatedBarcode = await generateProductBarcodeEAN13({ Product }, t);
+        }
+      }
+
+      await product.update(
+        {
+          brand_id: brand_id !== undefined ? brand_id || null : product.brand_id,
+          name_ar: name_ar !== undefined ? name_ar : product.name_ar,
+          name_en: name_en !== undefined ? name_en : product.name_en,
+          slug: slug !== undefined ? slug : product.slug,
+          sku: updatedSku,
+          barcode: updatedBarcode,
+          short_desc_ar: short_desc_ar !== undefined ? short_desc_ar || null : product.short_desc_ar,
+          short_desc_en: short_desc_en !== undefined ? short_desc_en || null : product.short_desc_en,
+          description_ar:
+            description_ar !== undefined ? description_ar || null : product.description_ar,
+          description_en:
+            description_en !== undefined ? description_en || null : product.description_en,
+          specifications:
+            specifications !== undefined ? specifications || null : product.specifications,
+          showcase_tabs:
+            showcase_tabs !== undefined ? showcase_tabs || null : product.showcase_tabs,
+          video_urls: Array.isArray(video_urls) ? video_urls : product.video_urls || [],
+          cost_price: cost_price !== undefined ? Number(cost_price) || 0 : product.cost_price,
+          original_price: effectiveOriginal,
+          sale_price: effectiveSale,
+          sale_ends_at:
+            sale_ends_at !== undefined
+              ? sale_ends_at
+                ? new Date(sale_ends_at)
+                : null
+              : product.sale_ends_at,
+          discount_percent,
+          stock_quantity:
+            stock_quantity !== undefined ? Number(stock_quantity) || 0 : product.stock_quantity,
+          low_stock_threshold:
+            low_stock_threshold !== undefined
+              ? Number(low_stock_threshold) || 5
+              : product.low_stock_threshold,
+          is_featured: is_featured !== undefined ? !!is_featured : product.is_featured,
+          is_active: is_active !== undefined ? !!is_active : product.is_active,
+        },
+        { transaction: t }
+      );
+
+      // Sync Assigned Categories
+      await ProductCategory.destroy({
+        where: { product_id: product.id },
+        transaction: t,
+      });
+
+      for (const catId of allCategoryIds) {
+        await ProductCategory.findOrCreate({
+          where: { product_id: product.id, category_id: catId },
+          defaults: {
+            product_id: product.id,
+            category_id: catId,
+            is_primary: String(catId) === activePrimaryId,
+            is_auto_assigned: false,
+          },
+          transaction: t,
+        });
+      }
+
+      // Sync Explicit Tags
+      await ProductTag.destroy({
+        where: { product_id: product.id },
+        transaction: t,
+      });
+
+      const uniqueTagIds = [...new Set((Array.isArray(tag_ids) ? tag_ids : []).filter(Boolean))];
+      for (const tagId of uniqueTagIds) {
+        await ProductTag.findOrCreate({
+          where: { product_id: product.id, tag_id: tagId },
+          defaults: {
+            product_id: product.id,
+            tag_id: tagId,
+          },
+          transaction: t,
+        });
+      }
+
+      // Sync Images if provided
+      if (Array.isArray(image_urls)) {
+        await ProductImage.destroy({
+          where: { product_id: product.id },
+          transaction: t,
+        });
+
+        for (let i = 0; i < image_urls.length; i++) {
+          const img = image_urls[i];
+          const urlStr = typeof img === 'string' ? img : img?.image_url;
+          if (!urlStr) continue;
+          await ProductImage.create(
+            {
+              product_id: product.id,
+              image_url: urlStr,
+              alt_text_ar: (typeof img === 'object' && img?.alt_text_ar) || product.name_ar,
+              alt_text_en: (typeof img === 'object' && img?.alt_text_en) || product.name_en,
+              is_primary: i === 0,
+              sort_order: i,
+            },
+            { transaction: t }
+          );
+        }
+      }
+
+      // Execute Hybrid Tag-to-Category auto-linking
+      if (activePrimaryId) {
+        await AutoCategorizationService.copyCategoryTagsToProduct(product.id, activePrimaryId, t);
+      }
+
+      await t.commit();
+
+      const updated = await Product.findByPk(product.id, {
+        include: [
+          { model: Brand, as: 'brand' },
+          { model: Category, as: 'categories' },
+          { model: Tag, as: 'tags' },
+          { model: ProductImage, as: 'images' },
+        ],
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Product updated successfully',
+        data: updated,
       });
     } catch (error) {
       await t.rollback();
@@ -532,25 +1084,19 @@ class CatalogController {
    */
   static async getHomeCategories(req, res, next) {
     try {
-      let categories = await Category.findAll({
-        where: { is_active: true, show_in_home_grid: true },
-        order: [['sort_order', 'ASC'], ['id', 'ASC']],
-        include: [
-          {
-            model: Product,
-            as: 'products',
-            where: { is_active: true },
-            required: false,
-            include: [{ model: ProductImage, as: 'images', required: false }],
-          },
-        ],
-      });
-
-      if (!categories || categories.length === 0) {
-        categories = await Category.findAll({
-          where: { is_active: true, parent_id: null },
-          order: [['sort_order', 'ASC'], ['id', 'ASC']],
-          limit: 6,
+      const catInclude = [
+        {
+          model: Product,
+          as: 'products',
+          where: { is_active: true },
+          required: false,
+          include: [{ model: ProductImage, as: 'images', required: false }],
+        },
+        {
+          model: Category,
+          as: 'subcategories',
+          where: { is_active: true },
+          required: false,
           include: [
             {
               model: Product,
@@ -560,11 +1106,36 @@ class CatalogController {
               include: [{ model: ProductImage, as: 'images', required: false }],
             },
           ],
+        },
+      ];
+
+      let categories = await Category.findAll({
+        where: { is_active: true, show_in_home_grid: true },
+        order: [['sort_order', 'ASC'], ['id', 'ASC']],
+        include: catInclude,
+      });
+
+      if (!categories || categories.length === 0) {
+        categories = await Category.findAll({
+          where: { is_active: true, parent_id: null },
+          order: [['sort_order', 'ASC'], ['id', 'ASC']],
+          limit: 6,
+          include: catInclude,
         });
       }
 
       const data = categories.map((cat) => {
-        const sortedProducts = [...(cat.products || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const directProducts = cat.products || [];
+        const subProducts = (cat.subcategories || []).flatMap((sub) => sub.products || []);
+        const uniqueMap = new Map();
+        [...directProducts, ...subProducts].forEach((p) => {
+          if (p && p.id && !uniqueMap.has(p.id)) {
+            uniqueMap.set(p.id, p);
+          }
+        });
+        const sortedProducts = Array.from(uniqueMap.values()).sort(
+          (a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0)
+        );
         return {
           id: cat.id,
           name_ar: cat.name_ar,
@@ -692,7 +1263,7 @@ class CatalogController {
   }
 
   /**
-   * Get All Categories with full admin details (flat & hierarchical)
+   * Get All Categories with full admin & storefront details (flat & hierarchical)
    * GET /api/v1/catalog/categories
    */
   static async getAllCategories(req, res, next) {
@@ -700,7 +1271,11 @@ class CatalogController {
       const categories = await Category.findAll({
         include: [
           { model: Category, as: 'parent', attributes: ['id', 'name_ar', 'name_en', 'slug'] },
-          { model: Category, as: 'subcategories', attributes: ['id', 'name_ar', 'name_en', 'slug', 'is_active'] },
+          {
+            model: Category,
+            as: 'subcategories',
+            attributes: ['id', 'name_ar', 'name_en', 'slug', 'is_active', 'starting_price', 'icon_url', 'image_url', 'description_ar', 'description_en', 'sort_order'],
+          },
           { model: Tag, as: 'tags', through: { attributes: [] } },
           { model: Product, as: 'products', attributes: ['id'] },
         ],
@@ -711,9 +1286,31 @@ class CatalogController {
         ],
       });
 
+      // Map category ID -> Set of product IDs for accurate rollup on root categories
+      const catProductIdsMap = new Map();
+      categories.forEach((cat) => {
+        const set = new Set((cat.products || []).map((p) => p.id));
+        catProductIdsMap.set(cat.id, set);
+      });
+
       const formatted = categories.map((cat) => {
         const json = cat.toJSON();
-        json.products_count = json.products ? json.products.length : 0;
+        const directSet = new Set(catProductIdsMap.get(cat.id) || []);
+        const directCount = directSet.size;
+
+        if (Array.isArray(json.subcategories) && json.subcategories.length > 0) {
+          json.subcategories = json.subcategories.map((sub) => {
+            const subSet = catProductIdsMap.get(sub.id) || new Set();
+            subSet.forEach((pid) => directSet.add(pid));
+            return {
+              ...sub,
+              products_count: subSet.size,
+            };
+          });
+        }
+
+        json.direct_products_count = directCount;
+        json.products_count = directSet.size;
         delete json.products;
         return json;
       });
@@ -729,23 +1326,65 @@ class CatalogController {
   }
 
   /**
-   * Get Single Category by ID
+   * Get Single Category by ID or Slug
    * GET /api/v1/catalog/categories/:id
    */
   static async getCategoryById(req, res, next) {
     try {
       const { id } = req.params;
-      const category = await Category.findByPk(id, {
+      const category = await Category.findOne({
+        where: {
+          [Op.or]: [
+            { id: String(id) },
+            { slug: String(id) },
+          ],
+        },
         include: [
-          { model: Category, as: 'parent', attributes: ['id', 'name_ar', 'name_en', 'slug'] },
-          { model: Category, as: 'subcategories', attributes: ['id', 'name_ar', 'name_en', 'slug', 'is_active', 'starting_price', 'icon_url', 'sort_order'] },
+          {
+            model: Category,
+            as: 'parent',
+            attributes: ['id', 'name_ar', 'name_en', 'slug', 'icon_url', 'image_url'],
+            include: [
+              {
+                model: Category,
+                as: 'subcategories',
+                attributes: ['id', 'name_ar', 'name_en', 'slug', 'is_active', 'starting_price', 'icon_url', 'image_url', 'sort_order'],
+              },
+            ],
+          },
+          {
+            model: Category,
+            as: 'subcategories',
+            attributes: ['id', 'name_ar', 'name_en', 'slug', 'is_active', 'starting_price', 'icon_url', 'image_url', 'description_ar', 'description_en', 'sort_order'],
+            include: [
+              { model: Product, as: 'products', attributes: ['id'] },
+            ],
+          },
           { model: Tag, as: 'tags', through: { attributes: [] } },
+          { model: Product, as: 'products', attributes: ['id'] },
         ],
       });
       if (!category) {
         return res.status(404).json({ success: false, message: 'Category not found' });
       }
-      return res.status(200).json({ success: true, data: category });
+
+      const json = category.toJSON();
+      const allProductIds = new Set((json.products || []).map((p) => p.id));
+      if (Array.isArray(json.subcategories)) {
+        json.subcategories = json.subcategories.map((sub) => {
+          const subIds = (sub.products || []).map((p) => p.id);
+          subIds.forEach((pid) => allProductIds.add(pid));
+          const { products, ...restSub } = sub;
+          return {
+            ...restSub,
+            products_count: subIds.length,
+          };
+        });
+      }
+      json.products_count = allProductIds.size;
+      delete json.products;
+
+      return res.status(200).json({ success: true, data: json });
     } catch (error) {
       next(error);
     }
@@ -1189,34 +1828,205 @@ class CatalogController {
   // =================== BUNDLES ===================
 
   /**
-   * Get Bundles with dynamically computed component stocks
+   * Helper to format and enrich a Bundle instance with real-time pricing, discount validity, and stock
+   */
+  static async formatBundleResponse(bundleInstance) {
+    const plain = typeof bundleInstance.toJSON === 'function' ? bundleInstance.toJSON() : bundleInstance;
+    const items = Array.isArray(plain.items) ? plain.items : [];
+
+    let computedOriginalTotal = 0;
+    let minAvailable = items.length > 0 ? Infinity : 0;
+
+    const enrichedItems = items
+      .filter((it) => it && it.product)
+      .map((it) => {
+        const prod = it.product;
+        const unitSellingPrice = Number(prod.sale_price || prod.original_price || 0);
+        const qty = Math.max(1, Number(it.quantity || 1));
+        const lineTotal = unitSellingPrice * qty;
+        computedOriginalTotal += lineTotal;
+
+        const ats = Math.max(0, Number(prod.stock_quantity || 0) - Number(prod.reserved_stock || 0));
+        const possible = Math.floor(ats / qty);
+        if (possible < minAvailable) minAvailable = possible;
+
+        const primaryImage =
+          prod.images?.find((img) => img.is_primary)?.image_url ||
+          prod.images?.[0]?.image_url ||
+          '/assets/placeholder-tech.png';
+
+        return {
+          id: it.id,
+          product_id: prod.id,
+          quantity: qty,
+          unit_price: unitSellingPrice,
+          line_total: lineTotal,
+          product: {
+            ...prod,
+            unit_selling_price: unitSellingPrice,
+            primary_image: primaryImage,
+          },
+        };
+      });
+
+    const originalTotal = computedOriginalTotal > 0 ? computedOriginalTotal : Number(plain.original_total_price || 0);
+    const savedBundlePrice = Number(plain.bundle_price || originalTotal);
+    const savedDiscountPercent = Number(plain.discount_percent || 0);
+
+    const now = new Date();
+    const isDiscountExpired = plain.expires_at ? new Date(plain.expires_at) < now : false;
+    const hasConfiguredDiscount = savedDiscountPercent > 0 || (savedBundlePrice > 0 && savedBundlePrice < originalTotal);
+    const isDiscountActive = hasConfiguredDiscount && !isDiscountExpired;
+
+    let effectiveBundlePrice = originalTotal;
+    if (isDiscountActive) {
+      if (savedBundlePrice > 0 && savedBundlePrice < originalTotal) {
+        effectiveBundlePrice = savedBundlePrice;
+      } else if (savedDiscountPercent > 0) {
+        effectiveBundlePrice = Math.round(originalTotal * (1 - savedDiscountPercent / 100));
+      }
+    }
+
+    const savingsAmount = Math.max(0, originalTotal - effectiveBundlePrice);
+    const effectiveDiscountPercent =
+      originalTotal > 0 && savingsAmount > 0
+        ? Math.round((savingsAmount / originalTotal) * 100)
+        : 0;
+
+    return {
+      ...plain,
+      items: enrichedItems,
+      products_count: enrichedItems.length,
+      computed_original_total: originalTotal,
+      effective_bundle_price: effectiveBundlePrice,
+      savings_amount: savingsAmount,
+      effective_discount_percent: effectiveDiscountPercent,
+      has_discount: hasConfiguredDiscount,
+      is_discount_expired: isDiscountExpired,
+      is_discount_active: isDiscountActive,
+      dynamic_available_stock: minAvailable === Infinity ? 0 : minAvailable,
+    };
+  }
+
+  /**
+   * Get Bundles with dynamically computed component stocks & prices
+   * Supports ?all=true (admin) and ?product_id=XXX (storefront product page)
    * GET /api/v1/catalog/bundles
    */
   static async getBundles(req, res, next) {
     try {
+      const { all, product_id, search } = req.query;
+      const whereClause = {};
+
+      if (all !== 'true') {
+        whereClause.is_active = true;
+      }
+
+      if (search && search.trim()) {
+        const q = `%${search.trim()}%`;
+        whereClause[Op.or] = [
+          { id: { [Op.iLike]: q } },
+          { name_ar: { [Op.iLike]: q } },
+          { name_en: { [Op.iLike]: q } },
+          { sku: { [Op.iLike]: q } },
+        ];
+      }
+
       const bundles = await Bundle.findAll({
-        where: { is_active: true },
+        where: whereClause,
         include: [
           {
             model: BundleItem,
             as: 'items',
-            include: [{ model: Product, as: 'product', attributes: ['id', 'name_ar', 'name_en', 'stock_quantity', 'reserved_stock'] }],
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: [
+                  'id',
+                  'name_ar',
+                  'name_en',
+                  'slug',
+                  'sku',
+                  'original_price',
+                  'sale_price',
+                  'discount_percent',
+                  'stock_quantity',
+                  'reserved_stock',
+                  'is_active',
+                ],
+                include: [
+                  { model: ProductImage, as: 'images' },
+                  { model: Brand, as: 'brand', attributes: ['id', 'name_ar', 'name_en', 'slug'] },
+                ],
+              },
+            ],
+          },
+          { model: Category, as: 'categories', through: { attributes: [] } },
+        ],
+        order: [['createdAt', 'DESC']],
+      });
+
+      let formattedBundles = await Promise.all(
+        bundles.map((b) => CatalogController.formatBundleResponse(b))
+      );
+
+      // Filter by product_id if requested (returns all bundles containing this product)
+      if (product_id) {
+        formattedBundles = formattedBundles.filter(
+          (b) =>
+            b.items &&
+            b.items.length > 0 &&
+            b.items.some((it) => String(it.product_id) === String(product_id))
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        count: formattedBundles.length,
+        data: formattedBundles,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get Single Bundle by ID or Slug
+   * GET /api/v1/catalog/bundles/:id
+   */
+  static async getBundleById(req, res, next) {
+    try {
+      const { id } = req.params;
+      const bundle = await Bundle.findOne({
+        where: {
+          [Op.or]: [{ id: String(id) }, { slug: String(id) }],
+        },
+        include: [
+          {
+            model: BundleItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                include: [
+                  { model: ProductImage, as: 'images' },
+                  { model: Brand, as: 'brand' },
+                ],
+              },
+            ],
           },
           { model: Category, as: 'categories', through: { attributes: [] } },
         ],
       });
 
-      const bundlesWithStock = await Promise.all(
-        bundles.map(async (b) => {
-          const { available_stock, items_breakdown } = await BundleService.calculateBundleStock(b.id);
-          const plain = b.toJSON();
-          plain.dynamic_available_stock = available_stock;
-          plain.items_breakdown = items_breakdown;
-          return res.localize(plain);
-        })
-      );
+      if (!bundle) {
+        return res.status(404).json({ success: false, message: 'Bundle not found' });
+      }
 
-      return res.status(200).json({ success: true, data: bundlesWithStock });
+      const formatted = await CatalogController.formatBundleResponse(bundle);
+      return res.status(200).json({ success: true, data: formatted });
     } catch (error) {
       next(error);
     }
@@ -1224,12 +2034,15 @@ class CatalogController {
 
   /**
    * Create Bundle
+   * Mandatory: name_ar (or name). Auto-generates unique Bundle ID.
+   * Optional: discount (percentage, fixed amount, or bundle_price) & expires_at.
    * POST /api/v1/catalog/bundles
    */
   static async createBundle(req, res, next) {
     const t = await sequelize.transaction();
     try {
       const {
+        name,
         name_ar,
         name_en,
         slug,
@@ -1237,59 +2050,386 @@ class CatalogController {
         description_ar,
         description_en,
         image_url,
+        discount_type = 'percentage', // 'percentage' | 'fixed' | 'custom_price' | 'none'
+        discount_value,
+        discount_percent,
         bundle_price,
         is_featured,
+        is_active = true,
         starts_at,
         expires_at,
         category_ids = [],
         items = [], // [{ product_id, quantity }]
       } = req.body;
 
-      if (!items || items.length === 0) {
-        return res.status(400).json({ success: false, message: 'Bundle must include at least one product item' });
+      const finalNameAr = (name_ar || name || '').trim();
+      if (!finalNameAr) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'اسم الباندل إجباري (Bundle name is required)',
+        });
+      }
+      const finalNameEn = (name_en || finalNameAr).trim();
+
+      if (!Array.isArray(items) || items.length === 0) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'يجب اختيار منتج واحد على الأقل داخل الباندل',
+        });
       }
 
-      // Compute original total price from component products
+      // Deduplicate products inside the same bundle
+      const uniqueItemsMap = new Map();
+      for (const it of items) {
+        if (it && it.product_id) {
+          const pid = String(it.product_id);
+          const qty = Math.max(1, Number(it.quantity || 1));
+          uniqueItemsMap.set(pid, { product_id: pid, quantity: qty });
+        }
+      }
+      const cleanItems = Array.from(uniqueItemsMap.values());
+
+      // Compute original total price from component products' active store prices
       let originalTotal = 0;
-      for (const it of items) {
-        const prod = await Product.findByPk(it.product_id, { transaction: t });
-        if (!prod) throw new Error(`Product #${it.product_id} not found`);
-        originalTotal += Number(prod.original_price) * Number(it.quantity);
+      let firstProductImage = null;
+
+      for (const it of cleanItems) {
+        const prod = await Product.findByPk(it.product_id, {
+          include: [{ model: ProductImage, as: 'images' }],
+          transaction: t,
+        });
+        if (!prod) {
+          await t.rollback();
+          return res.status(404).json({
+            success: false,
+            message: `المنتج ذو المعرف (${it.product_id}) غير موجود`,
+          });
+        }
+        const unitPrice = Number(prod.sale_price || prod.original_price || 0);
+        originalTotal += unitPrice * it.quantity;
+
+        if (!firstProductImage && prod.images?.length > 0) {
+          firstProductImage =
+            prod.images.find((img) => img.is_primary)?.image_url || prod.images[0]?.image_url;
+        }
       }
 
-      const discountPercent = Math.round(((originalTotal - bundle_price) / originalTotal) * 100);
+      // Calculate Optional Discount
+      let finalBundlePrice = originalTotal;
+      let finalDiscountPercent = 0;
 
-      const bundle = await Bundle.create({
-        name_ar,
-        name_en,
-        slug,
-        sku,
-        description_ar,
-        description_en,
-        image_url,
-        original_total_price: originalTotal,
-        bundle_price,
-        discount_percent: discountPercent,
-        is_featured: !!is_featured,
-        starts_at,
-        expires_at,
-        is_active: true,
-      }, { transaction: t });
-
-      for (const it of items) {
-        await BundleItem.create({
-          bundle_id: bundle.id,
-          product_id: it.product_id,
-          quantity: it.quantity || 1,
-        }, { transaction: t });
+      if (discount_type === 'percentage' && Number(discount_value) > 0) {
+        finalDiscountPercent = Math.min(99, Math.max(0, Math.round(Number(discount_value))));
+        finalBundlePrice = Math.round(originalTotal * (1 - finalDiscountPercent / 100));
+      } else if (discount_type === 'fixed' && Number(discount_value) > 0) {
+        const fixedOff = Math.min(originalTotal, Math.max(0, Number(discount_value)));
+        finalBundlePrice = Math.max(0, originalTotal - fixedOff);
+        finalDiscountPercent =
+          originalTotal > 0 ? Math.round(((originalTotal - finalBundlePrice) / originalTotal) * 100) : 0;
+      } else if (
+        (discount_type === 'custom_price' || bundle_price !== undefined) &&
+        bundle_price !== '' &&
+        bundle_price !== null &&
+        Number(bundle_price) > 0 &&
+        Number(bundle_price) < originalTotal
+      ) {
+        finalBundlePrice = Number(bundle_price);
+        finalDiscountPercent =
+          originalTotal > 0 ? Math.round(((originalTotal - finalBundlePrice) / originalTotal) * 100) : 0;
+      } else if (discount_percent !== undefined && Number(discount_percent) > 0) {
+        finalDiscountPercent = Math.min(99, Math.max(0, Math.round(Number(discount_percent))));
+        finalBundlePrice = Math.round(originalTotal * (1 - finalDiscountPercent / 100));
       }
 
-      for (const catId of category_ids) {
-        await bundle.addCategory(catId, { transaction: t });
+      // Generate Unique Bundle ID
+      const generatedId = await generateBundleId({ Bundle }, t);
+      const generatedSlug =
+        slug && slug.trim()
+          ? `${slug.trim()}-${generatedId.toLowerCase()}`
+          : `bundle-${generatedId.toLowerCase()}`;
+      const generatedSku = sku && sku.trim() ? sku.trim() : generatedId;
+
+      const bundle = await Bundle.create(
+        {
+          id: generatedId,
+          name_ar: finalNameAr,
+          name_en: finalNameEn,
+          slug: generatedSlug,
+          sku: generatedSku,
+          description_ar: description_ar || null,
+          description_en: description_en || null,
+          image_url: image_url || firstProductImage || '/assets/placeholder-tech.png',
+          original_total_price: originalTotal,
+          bundle_price: finalBundlePrice,
+          discount_percent: finalDiscountPercent,
+          is_featured: !!is_featured,
+          starts_at: starts_at ? new Date(starts_at) : null,
+          expires_at: expires_at ? new Date(expires_at) : null,
+          is_active: is_active !== undefined ? !!is_active : true,
+        },
+        { transaction: t }
+      );
+
+      for (const it of cleanItems) {
+        await BundleItem.create(
+          {
+            bundle_id: bundle.id,
+            product_id: it.product_id,
+            quantity: it.quantity,
+          },
+          { transaction: t }
+        );
+      }
+
+      if (Array.isArray(category_ids) && category_ids.length > 0) {
+        for (const catId of category_ids) {
+          await bundle.addCategory(catId, { transaction: t });
+        }
       }
 
       await t.commit();
-      return res.status(201).json({ success: true, message: 'Bundle created successfully', data: bundle });
+
+      const createdBundle = await Bundle.findByPk(bundle.id, {
+        include: [
+          {
+            model: BundleItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                include: [{ model: ProductImage, as: 'images' }, { model: Brand, as: 'brand' }],
+              },
+            ],
+          },
+        ],
+      });
+
+      const formatted = await CatalogController.formatBundleResponse(createdBundle);
+
+      return res.status(201).json({
+        success: true,
+        message: 'تم إنشاء الباندل بنجاح',
+        data: formatted,
+      });
+    } catch (error) {
+      await t.rollback();
+      next(error);
+    }
+  }
+
+  /**
+   * Update Bundle
+   * PUT /api/v1/catalog/bundles/:id
+   */
+  static async updateBundle(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+      const { id } = req.params;
+      const bundle = await Bundle.findByPk(id, { transaction: t });
+      if (!bundle) {
+        await t.rollback();
+        return res.status(404).json({ success: false, message: 'Bundle not found' });
+      }
+
+      const {
+        name,
+        name_ar,
+        name_en,
+        description_ar,
+        description_en,
+        image_url,
+        discount_type,
+        discount_value,
+        discount_percent,
+        bundle_price,
+        is_featured,
+        is_active,
+        starts_at,
+        expires_at,
+        items,
+      } = req.body;
+
+      const finalNameAr = (name_ar || name || bundle.name_ar || '').trim();
+      const finalNameEn = (name_en || finalNameAr || bundle.name_en || '').trim();
+
+      let cleanItems = [];
+      if (Array.isArray(items) && items.length > 0) {
+        const uniqueItemsMap = new Map();
+        for (const it of items) {
+          if (it && it.product_id) {
+            const pid = String(it.product_id);
+            const qty = Math.max(1, Number(it.quantity || 1));
+            uniqueItemsMap.set(pid, { product_id: pid, quantity: qty });
+          }
+        }
+        cleanItems = Array.from(uniqueItemsMap.values());
+
+        await BundleItem.destroy({ where: { bundle_id: bundle.id }, transaction: t });
+        for (const it of cleanItems) {
+          await BundleItem.create(
+            {
+              bundle_id: bundle.id,
+              product_id: it.product_id,
+              quantity: it.quantity,
+            },
+            { transaction: t }
+          );
+        }
+      } else {
+        const existingItems = await BundleItem.findAll({
+          where: { bundle_id: bundle.id },
+          transaction: t,
+        });
+        cleanItems = existingItems.map((it) => ({
+          product_id: it.product_id,
+          quantity: it.quantity,
+        }));
+      }
+
+      // Recompute original total
+      let originalTotal = 0;
+      let firstProductImage = null;
+
+      for (const it of cleanItems) {
+        const prod = await Product.findByPk(it.product_id, {
+          include: [{ model: ProductImage, as: 'images' }],
+          transaction: t,
+        });
+        if (prod) {
+          const unitPrice = Number(prod.sale_price || prod.original_price || 0);
+          originalTotal += unitPrice * it.quantity;
+          if (!firstProductImage && prod.images?.length > 0) {
+            firstProductImage =
+              prod.images.find((img) => img.is_primary)?.image_url || prod.images[0]?.image_url;
+          }
+        }
+      }
+
+      let finalBundlePrice = originalTotal;
+      let finalDiscountPercent = 0;
+
+      if (discount_type === 'none') {
+        finalBundlePrice = originalTotal;
+        finalDiscountPercent = 0;
+      } else if (discount_type === 'percentage' && Number(discount_value) > 0) {
+        finalDiscountPercent = Math.min(99, Math.max(0, Math.round(Number(discount_value))));
+        finalBundlePrice = Math.round(originalTotal * (1 - finalDiscountPercent / 100));
+      } else if (discount_type === 'fixed' && Number(discount_value) > 0) {
+        const fixedOff = Math.min(originalTotal, Math.max(0, Number(discount_value)));
+        finalBundlePrice = Math.max(0, originalTotal - fixedOff);
+        finalDiscountPercent =
+          originalTotal > 0 ? Math.round(((originalTotal - finalBundlePrice) / originalTotal) * 100) : 0;
+      } else if (
+        (discount_type === 'custom_price' || bundle_price !== undefined) &&
+        bundle_price !== '' &&
+        bundle_price !== null &&
+        Number(bundle_price) > 0 &&
+        Number(bundle_price) < originalTotal
+      ) {
+        finalBundlePrice = Number(bundle_price);
+        finalDiscountPercent =
+          originalTotal > 0 ? Math.round(((originalTotal - finalBundlePrice) / originalTotal) * 100) : 0;
+      } else if (discount_percent !== undefined) {
+        finalDiscountPercent = Math.min(99, Math.max(0, Math.round(Number(discount_percent))));
+        finalBundlePrice = Math.round(originalTotal * (1 - finalDiscountPercent / 100));
+      }
+
+      await bundle.update(
+        {
+          name_ar: finalNameAr,
+          name_en: finalNameEn,
+          description_ar: description_ar !== undefined ? description_ar : bundle.description_ar,
+          description_en: description_en !== undefined ? description_en : bundle.description_en,
+          image_url: image_url || firstProductImage || bundle.image_url,
+          original_total_price: originalTotal,
+          bundle_price: finalBundlePrice,
+          discount_percent: finalDiscountPercent,
+          is_featured: is_featured !== undefined ? !!is_featured : bundle.is_featured,
+          is_active: is_active !== undefined ? !!is_active : bundle.is_active,
+          starts_at: starts_at !== undefined ? (starts_at ? new Date(starts_at) : null) : bundle.starts_at,
+          expires_at: expires_at !== undefined ? (expires_at ? new Date(expires_at) : null) : bundle.expires_at,
+        },
+        { transaction: t }
+      );
+
+      await t.commit();
+
+      const updatedBundle = await Bundle.findByPk(bundle.id, {
+        include: [
+          {
+            model: BundleItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                include: [{ model: ProductImage, as: 'images' }, { model: Brand, as: 'brand' }],
+              },
+            ],
+          },
+        ],
+      });
+
+      const formatted = await CatalogController.formatBundleResponse(updatedBundle);
+
+      return res.status(200).json({
+        success: true,
+        message: 'تم تحديث الباندل بنجاح',
+        data: formatted,
+      });
+    } catch (error) {
+      await t.rollback();
+      next(error);
+    }
+  }
+
+  /**
+   * Toggle Bundle Active Status
+   * PATCH /api/v1/catalog/bundles/:id/toggle
+   */
+  static async toggleBundleStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const bundle = await Bundle.findByPk(id);
+      if (!bundle) {
+        return res.status(404).json({ success: false, message: 'Bundle not found' });
+      }
+      await bundle.update({ is_active: !bundle.is_active });
+      return res.status(200).json({
+        success: true,
+        message: 'تم تحديث حالة الباندل',
+        data: { id: bundle.id, is_active: bundle.is_active },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete Bundle
+   * DELETE /api/v1/catalog/bundles/:id
+   */
+  static async deleteBundle(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+      const { id } = req.params;
+      const bundle = await Bundle.findByPk(id, { transaction: t });
+      if (!bundle) {
+        await t.rollback();
+        return res.status(404).json({ success: false, message: 'Bundle not found' });
+      }
+
+      await BundleItem.destroy({ where: { bundle_id: id }, transaction: t });
+      await bundle.destroy({ transaction: t });
+
+      await t.commit();
+      return res.status(200).json({
+        success: true,
+        message: 'تم حذف الباندل بنجاح',
+      });
     } catch (error) {
       await t.rollback();
       next(error);

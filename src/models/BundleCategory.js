@@ -3,7 +3,7 @@ const { sequelize } = require('../config/db');
 
 const BundleCategory = sequelize.define('BundleCategory', {
   bundle_id: {
-    type: DataTypes.BIGINT,
+    type: DataTypes.STRING(50),
     primaryKey: true,
     references: {
       model: 'bundles',

@@ -31,7 +31,7 @@ const OrderItem = sequelize.define('OrderItem', {
     onDelete: 'SET NULL',
   },
   bundle_id: {
-    type: DataTypes.BIGINT,
+    type: DataTypes.STRING(50),
     allowNull: true,
     references: {
       model: 'bundles',

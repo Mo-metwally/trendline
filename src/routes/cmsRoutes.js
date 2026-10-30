@@ -21,8 +21,12 @@ router.put('/banners/reorder', authMiddleware, permitRoles('super_admin', 'erp_m
 router.put('/banners/:id', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.updateBanner);
 router.delete('/banners/:id', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.deleteBanner);
 router.patch('/shipping-zones/:id', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.updateShippingZone);
-router.get('/coupons', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.getCoupons);
+router.get('/coupons', CmsController.getCoupons);
+router.post('/coupons/validate', CmsController.validateCouponPublic);
 router.post('/coupons', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.createCoupon);
+router.put('/coupons/:id', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.updateCoupon);
+router.patch('/coupons/:id/toggle', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.toggleCouponStatus);
+router.delete('/coupons/:id', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.deleteCoupon);
 router.get('/contact-messages', authMiddleware, permitRoles('super_admin', 'erp_manager', 'sales_agent'), CmsController.getContactMessages);
 router.post('/settings', authMiddleware, permitRoles('super_admin', 'erp_manager'), CmsController.upsertSiteSetting);
 

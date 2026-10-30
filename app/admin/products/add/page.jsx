@@ -9,6 +9,8 @@ import {
   AdminHeader,
   CustomSelect,
   OptionIconRenderer,
+  ProductShowcaseStudio,
+  DEFAULT_SHOWCASE_TABS,
   useToast,
 } from '@/src/components/adminComponents';
 import {
@@ -43,6 +45,7 @@ import {
 } from 'react-icons/fa6';
 import dynamic from 'next/dynamic';
 import { formatFactory, formatDuration, formatBytes } from '@/src/utils/formatFactory';
+import StoreProductCard from '@/src/components/common/StoreProductCard/StoreProductCard';
 import './AddProduct.scss';
 
 const QuillEditor = dynamic(
@@ -144,6 +147,8 @@ export default function AddProductPage() {
   const [barcode, setBarcode] = useState('');
   const [stockQuantity, setStockQuantity] = useState(10);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
+  const [uniquenessErrors, setUniquenessErrors] = useState({});
+  const [checkingUnique, setCheckingUnique] = useState({});
 
   // Form Fields - Brand
   const [selectedBrandId, setSelectedBrandId] = useState('');
@@ -157,11 +162,13 @@ export default function AddProductPage() {
   const [galleryMedia, setGalleryMedia] = useState([]); // Array of max 9 items
   const [videoMedia, setVideoMedia] = useState([]); // Array of max 2 items
 
-  // Form Fields - Technical Specifications
+  // Form Fields - Technical Specifications (Bilingual: Arabic + English)
   const [specifications, setSpecifications] = useState([
-    { key: '', value: '' },
-    { key: '', value: '' },
+    { key_ar: '', key_en: '', value_ar: '', value_en: '', key: '', value: '' },
   ]);
+
+  // Form Fields - Product Showcase & Feature Pillars Studio
+  const [showcaseTabs, setShowcaseTabs] = useState(DEFAULT_SHOWCASE_TABS);
 
   // Form Fields - Tags
   const [selectedTagIds, setSelectedTagIds] = useState([]);
@@ -424,19 +431,116 @@ export default function AddProductPage() {
     return currentRootCategory.subcategories || [];
   }, [currentRootCategory]);
 
-  // Code Generators
-  const generateSkuCode = () => {
-    const prefix = 'TRD';
-    const catCode = primaryCategoryId ? primaryCategoryId.replace('_', '').toUpperCase() : 'GEN';
-    const rand = Math.floor(10000 + Math.random() * 90000);
-    setSku(`${prefix}-${catCode}-${rand}`);
+  // Standard EAN-13 Check Digit Calculation
+  const calculateEAN13Check = (code12) => {
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      const digit = parseInt(code12[i], 10);
+      sum += (i % 2 === 0) ? digit : digit * 3;
+    }
+    return (10 - (sum % 10)) % 10;
   };
 
-  const generateBarcodeCode = () => {
-    const prefix = '622'; // Egypt country prefix
-    const rand = Math.floor(100000000 + Math.random() * 900000000);
-    setBarcode(`${prefix}${rand}`);
+  // Code Generators (Guaranteed unique EAN-13 & SKU)
+  const generateBarcodeCode = async () => {
+    try {
+      const apiHost = getApiHost();
+      const res = await fetch(`${apiHost}/api/v1/catalog/products/generate-codes`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data?.barcode) {
+          setBarcode(json.data.barcode);
+          setUniquenessErrors((prev) => ({ ...prev, barcode: null }));
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // Fallback standard EAN-13
+    const prefix = '622';
+    let code12 = prefix;
+    for (let i = 0; i < 9; i++) {
+      code12 += Math.floor(Math.random() * 10);
+    }
+    const check = calculateEAN13Check(code12);
+    setBarcode(`${code12}${check}`);
+    setUniquenessErrors((prev) => ({ ...prev, barcode: null }));
   };
+
+  const generateSkuCode = async (targetCatId) => {
+    const catId = targetCatId || primaryCategoryId;
+    try {
+      const apiHost = getApiHost();
+      const res = await fetch(`${apiHost}/api/v1/catalog/products/generate-codes?category_id=${encodeURIComponent(catId || '')}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data?.sku) {
+          setSku(json.data.sku);
+          setUniquenessErrors((prev) => ({ ...prev, sku: null }));
+          return;
+        }
+      }
+    } catch (e) {}
+
+    const prefix = 'TRD';
+    const catCode = catId ? String(catId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() : 'GEN';
+    const rand = Math.floor(10000 + Math.random() * 90000);
+    setSku(`${prefix}-${catCode || 'GEN'}-${rand}`);
+    setUniquenessErrors((prev) => ({ ...prev, sku: null }));
+  };
+
+  // Live Uniqueness Checker for SKU, Barcode, Slug, Name AR, Name EN
+  const checkFieldUniqueness = useCallback(async (fieldName, value, excludeId = null) => {
+    if (!value || !value.trim()) {
+      setUniquenessErrors((prev) => ({ ...prev, [fieldName]: null }));
+      return true;
+    }
+    try {
+      setCheckingUnique((prev) => ({ ...prev, [fieldName]: true }));
+      const apiHost = getApiHost();
+      const url = `${apiHost}/api/v1/catalog/products/check-unique?${encodeURIComponent(fieldName)}=${encodeURIComponent(value.trim())}${excludeId ? `&exclude_id=${encodeURIComponent(excludeId)}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          const conflict = json.conflicts?.[fieldName] || null;
+          setUniquenessErrors((prev) => ({ ...prev, [fieldName]: conflict }));
+          return !conflict;
+        }
+      }
+    } catch (e) {
+      // ignore network glitch
+    } finally {
+      setCheckingUnique((prev) => ({ ...prev, [fieldName]: false }));
+    }
+    return true;
+  }, []);
+
+  // Auto-generate SKU & EAN-13 Barcode immediately on creation / mount
+  useEffect(() => {
+    let isMounted = true;
+    async function initCodes() {
+      try {
+        const apiHost = getApiHost();
+        const res = await fetch(`${apiHost}/api/v1/catalog/products/generate-codes`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data && isMounted) {
+            if (json.data.sku) setSku(json.data.sku);
+            if (json.data.barcode) setBarcode(json.data.barcode);
+            return;
+          }
+        }
+      } catch (e) {}
+
+      if (isMounted) {
+        generateSkuCode();
+        generateBarcodeCode();
+      }
+    }
+    initCodes();
+    return () => { isMounted = false; };
+  }, []);
 
   // Category Multi-selection handlers: Products can ONLY be assigned to subcategories
   const toggleCategorySelection = (categoryId) => {
@@ -518,6 +622,86 @@ export default function AddProductPage() {
     };
   }, [primaryCategoryId, flatCategories, isRtl]);
 
+  // Selected Categories full hierarchy model
+  const selectedCategoriesData = useMemo(() => {
+    return selectedCategoryIds.map((catId) => {
+      const cat = flatCategories.find((c) => String(c.id) === String(catId));
+      if (!cat) {
+        return {
+          id: catId,
+          name_ar: `قسم #${catId}`,
+          name_en: `Category #${catId}`,
+          slug: String(catId),
+          parent: null,
+          isPrimary: String(primaryCategoryId) === String(catId),
+        };
+      }
+      const parent = cat.parent_id
+        ? flatCategories.find((p) => String(p.id) === String(cat.parent_id))
+        : null;
+      return {
+        ...cat,
+        parent,
+        isPrimary: String(primaryCategoryId) === String(cat.id),
+      };
+    });
+  }, [selectedCategoryIds, flatCategories, primaryCategoryId]);
+
+  // Live Storefront Product Model for Preview Card
+  const livePreviewProduct = useMemo(() => {
+    const availImages = [
+      ...(coverMedia?.previewUrl || coverMedia?.uploadedUrl
+        ? [{ image_url: coverMedia.previewUrl || coverMedia.uploadedUrl, is_primary: true }]
+        : []),
+      ...galleryMedia
+        .filter((g) => g.mediaType !== 'video' && (g.previewUrl || g.uploadedUrl))
+        .map((g, idx) => ({
+          image_url: g.previewUrl || g.uploadedUrl,
+          is_primary: false,
+          sort_order: idx + 1,
+        })),
+    ];
+
+    const curBrand = brands.find((b) => String(b.id) === String(selectedBrandId));
+
+    return {
+      id: 'preview',
+      slug: slug || 'preview-product',
+      name_ar: nameAr || (isRtl ? 'اسم المنتج النموذجي' : 'Sample Product Title'),
+      name_en: nameEn || 'Sample Product Title',
+      short_desc_ar: shortDescAr,
+      short_desc_en: shortDescEn,
+      description_ar: descriptionAr,
+      sku: sku || 'PRD-PREVIEW',
+      brand: curBrand ? { name_ar: curBrand.name_ar, name_en: curBrand.name_en } : null,
+      original_price: originalPrice ? parseFloat(originalPrice) : 0,
+      sale_price: salePrice ? parseFloat(salePrice) : (originalPrice ? parseFloat(originalPrice) : 0),
+      discount_percent: metrics.discount,
+      stock_quantity: stockQuantity ? parseInt(stockQuantity, 10) : 12,
+      reserved_stock: 0,
+      is_featured: isFeatured,
+      images: availImages,
+    };
+  }, [
+    coverMedia,
+    galleryMedia,
+    brands,
+    selectedBrandId,
+    slug,
+    nameAr,
+    nameEn,
+    shortDescAr,
+    shortDescEn,
+    descriptionAr,
+    sku,
+    originalPrice,
+    salePrice,
+    metrics.discount,
+    stockQuantity,
+    isFeatured,
+    isRtl,
+  ]);
+
   // Filtered categories tree for search
   const filteredTree = useMemo(() => {
     if (!categorySearchQuery.trim()) return categoriesTree;
@@ -546,17 +730,26 @@ export default function AddProductPage() {
       .filter(Boolean);
   }, [categoriesTree, categorySearchQuery]);
 
-  // Specifications Repeater Handlers
+  // Specifications Repeater Handlers (Bilingual)
   const handleSpecChange = (index, field, value) => {
     setSpecifications((prev) => {
       const copy = [...prev];
-      copy[index][field] = value;
+      const current = copy[index] || {};
+      copy[index] = {
+        ...current,
+        [field]: value,
+        key: field === 'key_ar' ? value : (current.key_ar || current.key || ''),
+        value: field === 'value_ar' ? value : (current.value_ar || current.value || ''),
+      };
       return copy;
     });
   };
 
   const addSpecRow = () => {
-    setSpecifications((prev) => [...prev, { key: '', value: '' }]);
+    setSpecifications((prev) => [
+      ...prev,
+      { key_ar: '', key_en: '', value_ar: '', value_en: '', key: '', value: '' },
+    ]);
   };
 
   const removeSpecRow = (index) => {
@@ -1014,17 +1207,43 @@ export default function AddProductPage() {
       return;
     }
 
+    // Check if any active uniqueness conflict exists
+    const activeConflicts = Object.values(uniquenessErrors).filter(Boolean);
+    if (activeConflicts.length > 0) {
+      setErrorMessage(activeConflicts[0]);
+      toast.error(activeConflicts[0], isRtl ? 'تعارض بيانات' : 'Uniqueness Conflict');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const token = await ensureAuthToken();
       const apiHost = getApiHost();
 
-      // Build Specifications Object
+      // Build Specifications Payload (Bilingual Items + Legacy Key-Value Map)
+      const validSpecs = specifications.filter(
+        (s) =>
+          (s.key_ar && s.key_ar.trim()) ||
+          (s.key_en && s.key_en.trim()) ||
+          (s.key && s.key.trim())
+      );
+
+      const specsItems = validSpecs.map((s) => ({
+        key_ar: (s.key_ar || s.key || '').trim(),
+        key_en: (s.key_en || '').trim(),
+        value_ar: (s.value_ar || s.value || '').trim(),
+        value_en: (s.value_en || '').trim(),
+        key: (s.key_ar || s.key || '').trim(),
+        value: (s.value_ar || s.value || '').trim(),
+      }));
+
       const specsObject = {};
-      specifications.forEach((s) => {
-        if (s.key.trim()) {
-          specsObject[s.key.trim()] = s.value.trim();
+      specsItems.forEach((s) => {
+        if (s.key_ar) {
+          specsObject[s.key_ar] = s.value_ar;
+        } else if (s.key_en) {
+          specsObject[s.key_en] = s.value_en;
         }
       });
 
@@ -1072,8 +1291,10 @@ export default function AddProductPage() {
         description_en: descriptionEn.trim() || null,
         specifications: {
           ...specsObject,
+          items: specsItems,
           ...(videosPayload.length > 0 ? { media_videos: videosPayload } : {}),
         },
+        showcase_tabs: showcaseTabs,
         image_urls: imagesPayload,
         video_urls: videosPayload,
         tag_ids: selectedTagIds,
@@ -1245,10 +1466,21 @@ export default function AddProductPage() {
                     <input
                       type="text"
                       required
+                      className={uniquenessErrors.name_ar ? 'has-unique-error' : ''}
                       placeholder={isRtl ? 'مثال: سويتش سيسكو كاتاليست 2960 جيجابت إيثرنت' : 'e.g. Cisco Catalyst 2960 Switch'}
                       value={nameAr}
-                      onChange={(e) => setNameAr(e.target.value)}
+                      onChange={(e) => {
+                        setNameAr(e.target.value);
+                        if (uniquenessErrors.name_ar) setUniquenessErrors((prev) => ({ ...prev, name_ar: null }));
+                      }}
+                      onBlur={() => checkFieldUniqueness('name_ar', nameAr)}
                     />
+                    {uniquenessErrors.name_ar && (
+                      <span className="unique-field-error">
+                        <FaTriangleExclamation />
+                        <span>{uniquenessErrors.name_ar}</span>
+                      </span>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -1259,10 +1491,18 @@ export default function AddProductPage() {
                     <input
                       type="text"
                       required
+                      className={uniquenessErrors.name_en ? 'has-unique-error' : ''}
                       placeholder="e.g. Cisco Catalyst 2960 Gigabit Switch"
                       value={nameEn}
                       onChange={handleNameEnChange}
+                      onBlur={() => checkFieldUniqueness('name_en', nameEn)}
                     />
+                    {uniquenessErrors.name_en && (
+                      <span className="unique-field-error">
+                        <FaTriangleExclamation />
+                        <span>{uniquenessErrors.name_en}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1283,13 +1523,22 @@ export default function AddProductPage() {
                   <input
                     type="text"
                     required
+                    className={uniquenessErrors.slug ? 'has-unique-error' : ''}
                     placeholder="cisco-catalyst-2960-gigabit-switch"
                     value={slug}
                     onChange={(e) => {
                       setAutoSlug(false);
                       setSlug(e.target.value);
+                      if (uniquenessErrors.slug) setUniquenessErrors((prev) => ({ ...prev, slug: null }));
                     }}
+                    onBlur={() => checkFieldUniqueness('slug', slug)}
                   />
+                  {uniquenessErrors.slug && (
+                    <span className="unique-field-error">
+                      <FaTriangleExclamation />
+                      <span>{uniquenessErrors.slug}</span>
+                    </span>
+                  )}
                   <div className="slug-preview-bar">
                     <span>{isRtl ? 'المسار الدائم في المتجر:' : 'Storefront URL:'}</span>
                     <span className="slug-highlight">
@@ -1819,6 +2068,119 @@ export default function AddProductPage() {
                     </div>
                   </div>
 
+                  {/* Selected Categories Showcase with Full Hierarchy */}
+                  <div className="selected-categories-panel">
+                    <div className="scp-header">
+                      <div className="scp-title-group">
+                        <div className="scp-icon">
+                          <FaSitemap />
+                        </div>
+                        <div>
+                          <h4>{isRtl ? 'الأقسام والتصنيفات المحددة للمنتج' : 'Selected Product Categories'}</h4>
+                          <p className="scp-rule-note">
+                            {isRtl
+                              ? 'التسلسل المعتمد: القسم الرئيسي ← القسم الفرعي ← المنتج. مع اختيار قسم أساسي واحد.'
+                              : 'Approved Sequence: Root Category → Subcategory → Product. With one primary category.'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="scp-count-badge">
+                        {selectedCategoriesData.length} {isRtl ? 'أقسام محددة' : 'Selected'}
+                      </span>
+                    </div>
+
+                    {selectedCategoriesData.length === 0 ? (
+                      <div className="scp-empty-state">
+                        <FaFolderTree className="empty-icon" />
+                        <div>
+                          <strong>{isRtl ? 'لم يتم تحديد أي قسم للمنتج حتى الآن!' : 'No categories selected yet!'}</strong>
+                          <p>
+                            {isRtl
+                              ? 'يرجى اختيار القسم الرئيسي بالأسفل (الخطوة 1) ثم تحديد الأقسام الفرعية التابعة له (الخطوة 2)، وتعيين قسم أساسي واحد.'
+                              : 'Please select a root category below (Step 1) and pick its subcategories (Step 2), then designate one primary category.'}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="scp-cards-list">
+                        {selectedCategoriesData.map((item) => {
+                          const rootTitle = isRtl
+                            ? (item.parent?.name_ar || item.parent?.name_en || 'القسم الرئيسي')
+                            : (item.parent?.name_en || item.parent?.name_ar || 'Root Category');
+                          const subTitle = isRtl
+                            ? (item.name_ar || item.name_en)
+                            : (item.name_en || item.name_ar);
+
+                          return (
+                            <div
+                              key={item.id}
+                              className={`selected-cat-card ${item.isPrimary ? 'is-primary' : ''}`}
+                            >
+                              <div className="scc-chain-row">
+                                <span className="chain-step root-step">
+                                  <FaFolder className="step-icon" />
+                                  <span>{rootTitle}</span>
+                                </span>
+                                <span className="chain-arrow">
+                                  {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
+                                </span>
+                                <span className="chain-step sub-step">
+                                  <OptionIconRenderer
+                                    iconUrl={item.icon_url}
+                                    imageUrl={item.image_url}
+                                    isSubcategory={true}
+                                  />
+                                  <span>{subTitle}</span>
+                                </span>
+                                <span className="chain-arrow">
+                                  {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
+                                </span>
+                                <span className="chain-step prod-step">
+                                  <span>{nameAr || nameEn || (isRtl ? '[اسم المنتج]' : '[Product]')}</span>
+                                </span>
+                              </div>
+
+                              <div className="scc-meta-row">
+                                <div className="scc-info">
+                                  <span className="scc-id">ID: {item.id}</span>
+                                  {item.slug && <span className="scc-slug">#{item.slug}</span>}
+                                </div>
+
+                                <div className="scc-actions">
+                                  {item.isPrimary ? (
+                                    <span className="primary-active-badge">
+                                      <FaStar />
+                                      <span>{isRtl ? 'القسم الأساسي المعتمد' : 'Primary Category'}</span>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="btn-make-primary"
+                                      onClick={(e) => setAsPrimaryCategory(item.id, e)}
+                                      title={isRtl ? 'تعيين هذا القسم كقسم أساسي للمنتج' : 'Set as primary category'}
+                                    >
+                                      <FaRegStar />
+                                      <span>{isRtl ? 'تعيين كقسم أساسي' : 'Set as Primary'}</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    className="btn-remove-selected-cat"
+                                    onClick={() => toggleCategorySelection(item.id)}
+                                    title={isRtl ? 'إزالة هذا القسم من المنتج' : 'Remove category'}
+                                  >
+                                    <FaXmark size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Step 1: Parent Category Custom Selector */}
                   <div className="root-category-picker-box">
                     <label className="picker-step-label">
@@ -2195,14 +2557,25 @@ export default function AddProductPage() {
                     <div className="input-with-button-wrap">
                       <input
                         type="text"
+                        className={uniquenessErrors.sku ? 'has-unique-error' : ''}
                         placeholder="e.g. TRD-CISCO-8492"
                         value={sku}
-                        onChange={(e) => setSku(e.target.value)}
+                        onChange={(e) => {
+                          setSku(e.target.value);
+                          if (uniquenessErrors.sku) setUniquenessErrors((prev) => ({ ...prev, sku: null }));
+                        }}
+                        onBlur={() => checkFieldUniqueness('sku', sku)}
                       />
-                      <button type="button" className="btn-inner-action" onClick={generateSkuCode}>
+                      <button type="button" className="btn-inner-action" onClick={() => generateSkuCode()}>
                         {isRtl ? 'توليد تلقائي' : 'Generate'}
                       </button>
                     </div>
+                    {uniquenessErrors.sku && (
+                      <span className="unique-field-error">
+                        <FaTriangleExclamation />
+                        <span>{uniquenessErrors.sku}</span>
+                      </span>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -2210,14 +2583,25 @@ export default function AddProductPage() {
                     <div className="input-with-button-wrap">
                       <input
                         type="text"
+                        className={uniquenessErrors.barcode ? 'has-unique-error' : ''}
                         placeholder="e.g. 6221234567890"
                         value={barcode}
-                        onChange={(e) => setBarcode(e.target.value)}
+                        onChange={(e) => {
+                          setBarcode(e.target.value);
+                          if (uniquenessErrors.barcode) setUniquenessErrors((prev) => ({ ...prev, barcode: null }));
+                        }}
+                        onBlur={() => checkFieldUniqueness('barcode', barcode)}
                       />
                       <button type="button" className="btn-inner-action" onClick={generateBarcodeCode}>
                         {isRtl ? 'توليد باركود' : 'Generate'}
                       </button>
                     </div>
+                    {uniquenessErrors.barcode && (
+                      <span className="unique-field-error">
+                        <FaTriangleExclamation />
+                        <span>{uniquenessErrors.barcode}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -2280,35 +2664,119 @@ export default function AddProductPage() {
 
                 <div className="specs-repeater-container">
                   {specifications.map((spec, idx) => (
-                    <div key={idx} className="spec-row">
-                      <input
-                        type="text"
-                        placeholder={isRtl ? 'اسم الخاصية (مثال: المعالج / الرام / المنافذ)' : 'Property (e.g. Ports / Processor)'}
-                        value={spec.key}
-                        onChange={(e) => handleSpecChange(idx, 'key', e.target.value)}
-                      />
-                      <input
-                        type="text"
-                        placeholder={isRtl ? 'القيمة (مثال: 24 Gigabit Ports / 16GB DDR5)' : 'Value (e.g. 24 Gigabit Ports)'}
-                        value={spec.value}
-                        onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="btn-remove-spec"
-                        onClick={() => removeSpecRow(idx)}
-                        title={isRtl ? 'حذف هذه الخاصية' : 'Remove specification'}
-                      >
-                        <FaXmark />
-                      </button>
+                    <div key={idx} className="spec-bilingual-card">
+                      <div className="spec-card-top-bar">
+                        <div className="spec-card-badge-wrap">
+                          <span className="spec-badge-num">
+                            {isRtl ? `خاصية ومواصفة #${idx + 1}` : `Specification #${idx + 1}`}
+                          </span>
+                          <span className="spec-badge-hint">
+                            {isRtl ? 'حقل موحد مزدوج اللغة (عربي / English)' : 'Unified Bilingual Field (AR / EN)'}
+                          </span>
+                        </div>
+                        {specifications.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-remove-spec-card"
+                            onClick={() => removeSpecRow(idx)}
+                            title={isRtl ? 'حذف هذه الخاصية بالكامل' : 'Remove specification'}
+                          >
+                            <FaXmark size={12} />
+                            <span>{isRtl ? 'حذف الخاصية' : 'Remove'}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="spec-bilingual-body">
+                        {/* Arabic Section */}
+                        <div className="spec-lang-section ar-section">
+                          <div className="lang-tag ar-tag">
+                            <span>🇸🇦 البيانات بالعربية (AR)</span>
+                          </div>
+                          <div className="spec-inputs-row">
+                            <div className="spec-field-item">
+                              <label>{isRtl ? 'اسم الخاصية (عربي)' : 'Property Name (Arabic)'}</label>
+                              <input
+                                type="text"
+                                placeholder={isRtl ? 'مثال: المعالج / الرام / المنافذ / الدقة' : 'e.g. Processor / RAM / Ports'}
+                                value={spec.key_ar ?? spec.key ?? ''}
+                                onChange={(e) => handleSpecChange(idx, 'key_ar', e.target.value)}
+                              />
+                            </div>
+                            <div className="spec-field-item">
+                              <label>{isRtl ? 'القيمة (عربي)' : 'Value (Arabic)'}</label>
+                              <input
+                                type="text"
+                                placeholder={isRtl ? 'مثال: إنتل Core i7 الجيل 13 / 16 جيجابايت DDR5' : 'e.g. Intel Core i7 / 16GB DDR5'}
+                                value={spec.value_ar ?? spec.value ?? ''}
+                                onChange={(e) => handleSpecChange(idx, 'value_ar', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* English Section */}
+                        <div className="spec-lang-section en-section">
+                          <div className="lang-tag en-tag">
+                            <span>🇬🇧 English Details (EN)</span>
+                          </div>
+                          <div className="spec-inputs-row">
+                            <div className="spec-field-item">
+                              <label>Property Name (English)</label>
+                              <input
+                                type="text"
+                                dir="ltr"
+                                placeholder="e.g. Processor / Memory RAM / Gigabit Ports"
+                                value={spec.key_en ?? ''}
+                                onChange={(e) => handleSpecChange(idx, 'key_en', e.target.value)}
+                              />
+                            </div>
+                            <div className="spec-field-item">
+                              <label>Value (English)</label>
+                              <input
+                                type="text"
+                                dir="ltr"
+                                placeholder="e.g. Intel Core i7 13th Gen / 16GB DDR5"
+                                value={spec.value_en ?? ''}
+                                onChange={(e) => handleSpecChange(idx, 'value_en', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
 
                   <button type="button" className="btn-add-spec-row" onClick={addSpecRow}>
-                    <span>+ {isRtl ? 'إضافة مواصفة فنية جديدة' : 'Add Specification'}</span>
+                    <FaPlus size={12} />
+                    <span>{isRtl ? 'إضافة مواصفة وخاصية فنية جديدة (Add Specification)' : 'Add Technical Specification'}</span>
                   </button>
                 </div>
               </div>
+
+              {/* Card 6.5: Product Showcase Tabs & Feature Pillars Studio */}
+              <ProductShowcaseStudio
+                showcaseTabs={showcaseTabs}
+                onChange={setShowcaseTabs}
+                productContext={{
+                  nameAr,
+                  nameEn,
+                  sku,
+                  brandName:
+                    brands.find((b) => String(b.id) === String(selectedBrandId))?.name_ar ||
+                    brands.find((b) => String(b.id) === String(selectedBrandId))?.name_en ||
+                    '',
+                  categoryName:
+                    activeBreadcrumbTrail?.subName ||
+                    activeBreadcrumbTrail?.rootName ||
+                    '',
+                  coverImage: coverMedia?.previewUrl || coverMedia?.uploadedUrl || '',
+                  descriptionAr,
+                  descriptionEn,
+                  specifications,
+                }}
+                isRtl={isRtl}
+              />
             </div>
 
             {/* ==============================================================
@@ -2329,57 +2797,12 @@ export default function AddProductPage() {
                   </div>
                 </div>
 
-                <div className="storefront-card-mockup">
-                  <div className="card-mockup-image">
-                    {coverMedia?.previewUrl || coverMedia?.uploadedUrl ? (
-                      <img
-                        src={coverMedia.previewUrl || coverMedia.uploadedUrl}
-                        alt="Product Card Preview"
-                        onError={(e) => {
-                          e.target.src = '/icons/fallback-product.svg';
-                        }}
-                      />
-                    ) : (
-                      <div className="mockup-empty-img">
-                        <FaImage />
-                        <span>{isRtl ? 'في انتظار غلاف المنتج...' : 'Awaiting Cover...'}</span>
-                      </div>
-                    )}
-                    {metrics.discount > 0 && (
-                      <span className="discount-pill">خصم {metrics.discount}%</span>
-                    )}
-                    {isFeatured && (
-                      <span className="featured-pill"><FaStar /> {isRtl ? 'مميز' : 'Featured'}</span>
-                    )}
-                  </div>
-
-                  <div className="card-mockup-body">
-                    {activeBreadcrumbTrail?.rootName && (
-                      <span className="mockup-category-crumb">
-                        {activeBreadcrumbTrail.rootName}
-                        {activeBreadcrumbTrail.subName ? ` / ${activeBreadcrumbTrail.subName}` : ''}
-                      </span>
-                    )}
-                    <h4 className="mockup-product-name">
-                      {nameAr || nameEn || (isRtl ? 'اسم المنتج النموذجي' : 'Product Title Preview')}
-                    </h4>
-
-                    <div className="mockup-pricing-row">
-                      <span className="current-price">
-                        {metrics.effectivePrice > 0 ? metrics.effectivePrice : '0.00'} <small>ج.م</small>
-                      </span>
-                      {salePrice && parseFloat(originalPrice) > parseFloat(salePrice) && (
-                        <span className="original-price">{originalPrice} ج.م</span>
-                      )}
-                    </div>
-
-                    {saleRemainingText && !saleRemainingText.expired && (
-                      <div className="mockup-countdown-pill">
-                        <FaClock style={{ fontSize: 10 }} />
-                        <span>{saleRemainingText.text}</span>
-                      </div>
-                    )}
-                  </div>
+                <div className="admin-live-preview-stage">
+                  <StoreProductCard
+                    product={livePreviewProduct}
+                    lang={isRtl ? 'ar' : 'en'}
+                    isPreview={true}
+                  />
                 </div>
               </div>
 

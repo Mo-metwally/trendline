@@ -670,13 +670,19 @@ export default function AdminSliderPage() {
 
     if (banner.target_url && banner.target_url.startsWith('/categories/')) {
       setLinkMode('category');
-      const slug = banner.target_url.replace('/categories/', '');
-      const matched = categories.find((c) => c.slug === slug);
+      const parts = banner.target_url.replace('/categories/', '').split('/').filter(Boolean);
+      const idOrSlug = parts[0] || '';
+      const matched = categories.find((c) => String(c.id) === idOrSlug || c.slug === idOrSlug);
       if (matched) setSelectedCategoryId(String(matched.id));
-    } else if (banner.target_url && banner.target_url.startsWith('/products/')) {
+    } else if (
+      banner.target_url &&
+      (banner.target_url.startsWith('/pd/') || banner.target_url.startsWith('/products/'))
+    ) {
       setLinkMode('product');
-      const slug = banner.target_url.replace('/products/', '');
-      const matched = products.find((p) => p.slug === slug || String(p.id) === slug);
+      const cleanPath = banner.target_url.replace(/^\/(pd|products)\//, '');
+      const parts = cleanPath.split('/').filter(Boolean);
+      const idOrSlug = parts[0] || '';
+      const matched = products.find((p) => String(p.id) === idOrSlug || p.slug === idOrSlug);
       if (matched) setSelectedProductId(String(matched.id));
     } else {
       setLinkMode('custom');
@@ -739,13 +745,19 @@ export default function AdminSliderPage() {
 
     if (banner.target_url && banner.target_url.startsWith('/categories/')) {
       setImageLinkMode('category');
-      const slug = banner.target_url.replace('/categories/', '');
-      const matched = categories.find((c) => c.slug === slug);
+      const parts = banner.target_url.replace('/categories/', '').split('/').filter(Boolean);
+      const idOrSlug = parts[0] || '';
+      const matched = categories.find((c) => String(c.id) === idOrSlug || c.slug === idOrSlug);
       if (matched) setImageSelectedCatId(String(matched.id));
-    } else if (banner.target_url && banner.target_url.startsWith('/products/')) {
+    } else if (
+      banner.target_url &&
+      (banner.target_url.startsWith('/pd/') || banner.target_url.startsWith('/products/'))
+    ) {
       setImageLinkMode('product');
-      const slug = banner.target_url.replace('/products/', '');
-      const matched = products.find((p) => p.slug === slug || String(p.id) === slug);
+      const cleanPath = banner.target_url.replace(/^\/(pd|products)\//, '');
+      const parts = cleanPath.split('/').filter(Boolean);
+      const idOrSlug = parts[0] || '';
+      const matched = products.find((p) => String(p.id) === idOrSlug || p.slug === idOrSlug);
       if (matched) setImageSelectedProdId(String(matched.id));
     } else {
       setImageLinkMode('custom');
@@ -897,10 +909,10 @@ export default function AdminSliderPage() {
       let targetUrl = formData.target_url;
       if (linkMode === 'category') {
         const cat = categories.find((c) => String(c.id) === String(selectedCategoryId));
-        targetUrl = cat ? `/categories/${cat.slug}` : '/categories';
+        targetUrl = cat ? `/categories/${cat.id}/${cat.slug || cat.id}` : '/categories';
       } else if (linkMode === 'product') {
         const prod = products.find((p) => String(p.id) === String(selectedProductId));
-        targetUrl = prod ? `/products/${prod.slug || prod.id}` : '/products';
+        targetUrl = prod ? `/pd/${prod.id}/${prod.slug || prod.id}` : '/categories';
       }
 
       let bgStyleToSave = presetStyle;
@@ -989,10 +1001,10 @@ export default function AdminSliderPage() {
       let targetUrl = imageFormData.target_url;
       if (imageLinkMode === 'category') {
         const cat = categories.find((c) => String(c.id) === String(imageSelectedCatId));
-        targetUrl = cat ? `/categories/${cat.slug}` : '/categories';
+        targetUrl = cat ? `/categories/${cat.id}/${cat.slug || cat.id}` : '/categories';
       } else if (imageLinkMode === 'product') {
         const prod = products.find((p) => String(p.id) === String(imageSelectedProdId));
-        targetUrl = prod ? `/products/${prod.slug || prod.id}` : '/products';
+        targetUrl = prod ? `/pd/${prod.id}/${prod.slug || prod.id}` : '/categories';
       }
 
       const highlightsJson = {

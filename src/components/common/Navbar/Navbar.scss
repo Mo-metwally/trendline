@@ -126,35 +126,79 @@
       }
     }
 
-    /* User Actions (Login, Register, Cart) */
+    /* User Actions (Language, Contact / Dashboard, Cart) */
     .nav-user-actions {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 12px;
       flex-shrink: 0;
 
       .user-link-item {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 7px;
         font-size: 13.5px;
-        font-weight: 700;
+        font-weight: 800;
         color: var(--main-color);
         text-decoration: none;
-        padding: 8px 12px;
-        border-radius: 10px;
+        padding: 9px 14px;
+        border-radius: 11px;
+        border: 1.5px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        font-family: inherit;
         transition: all 0.2s ease;
 
         .link-icon {
           display: flex;
           align-items: center;
           justify-content: center;
-          color: var(--main-color);
+          color: currentColor;
         }
 
         &:hover {
           background: rgba(0, 87, 194, 0.08);
           color: #00469c;
+        }
+
+        &.lang-switch-btn {
+          background: #f8fafc;
+          border-color: #e2e8f0;
+          color: #334155;
+
+          &:hover {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: var(--main-color);
+          }
+        }
+
+        &.contact-us-btn {
+          background: rgba(0, 87, 194, 0.06);
+          border-color: rgba(0, 87, 194, 0.16);
+          color: var(--main-color);
+
+          &:hover {
+            background: var(--main-color);
+            border-color: var(--main-color);
+            color: #ffffff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 87, 194, 0.2);
+          }
+        }
+
+        &.admin-dashboard-btn {
+          background: linear-gradient(135deg, var(--main-color) 0%, #1d4ed8 100%);
+          border-color: #1d4ed8;
+          color: #ffffff;
+          box-shadow: 0 4px 14px rgba(0, 87, 194, 0.24);
+
+          &:hover {
+            background: linear-gradient(135deg, #00469c 0%, #1e40af 100%);
+            color: #ffffff;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(0, 87, 194, 0.34);
+          }
         }
       }
 

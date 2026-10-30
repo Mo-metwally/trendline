@@ -1,0 +1,798 @@
+.amazon-gallery-wrapper {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  position: relative;
+  width: 100%;
+  min-height: 440px;
+
+  @media (max-width: 768px) {
+    flex-direction: column-reverse;
+    min-height: auto;
+    gap: 12px;
+  }
+
+  /* ================= 1. AMAZON VERTICAL THUMBNAIL RAIL ================= */
+  .amazon-thumbs-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 76px;
+    flex-shrink: 0;
+    position: relative;
+    user-select: none;
+
+    @media (max-width: 768px) {
+      flex-direction: row;
+      width: 100%;
+      height: 72px;
+      overflow-x: auto;
+    }
+
+    .rail-nav-btn {
+      width: 100%;
+      height: 22px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #cbd5e1;
+      }
+    }
+
+    .thumbs-scroll-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 440px;
+      overflow-y: auto;
+      padding-right: 2px;
+      padding-left: 4px;
+
+      @media (max-width: 768px) {
+        flex-direction: row;
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+        width: 100%;
+        padding: 2px;
+      }
+
+      &::-webkit-scrollbar {
+        width: 3px;
+        height: 3px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+    }
+
+    .amazon-thumb-btn {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      border-radius: 10px;
+      border: 1.5px solid #d5d9d9;
+      background: #ffffff;
+      padding: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0;
+
+      @media (max-width: 768px) {
+        width: 62px;
+        height: 62px;
+      }
+
+      .thumb-img-wrapper {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border-radius: 6px;
+        background: #090d16;
+
+        img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+
+          &.thumb-video-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+        }
+
+        .thumb-video-element {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          pointer-events: none;
+        }
+      }
+
+      &:hover {
+        border-color: #e77600;
+        box-shadow: 0 2px 8px rgba(231, 118, 0, 0.2);
+        transform: translateY(-1px);
+      }
+
+      &.active {
+        border-color: #e77600;
+        border-width: 2px;
+        box-shadow: 0 0 0 1px #e77600, 0 3px 10px rgba(231, 118, 0, 0.25);
+        background: #fffcf8;
+
+        /* Amazon triangle arrow pointing from thumbnail to main stage (in RTL: pointing LEFT) */
+        .active-arrow-indicator {
+          display: block;
+          position: absolute;
+          left: -8px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 0;
+          height: 0;
+          border-top: 6px solid transparent;
+          border-bottom: 6px solid transparent;
+          border-right: 7px solid #e77600;
+
+          @media (max-width: 768px) {
+            display: none;
+          }
+        }
+      }
+
+      /* Amazon Video Badge on Thumbnail */
+      &.is-video-thumb {
+        .video-thumb-badge {
+          position: absolute;
+          bottom: 4px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(15, 23, 42, 0.88);
+          backdrop-filter: blur(4px);
+          color: #ffffff;
+          font-size: 9.5px;
+          font-weight: 800;
+          padding: 2px 7px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          white-space: nowrap;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+
+          svg {
+            color: #f59e0b;
+          }
+        }
+      }
+    }
+  }
+
+  /* ================= 2. AMAZON MAIN MEDIA STAGE ================= */
+  .amazon-main-stage {
+    flex: 1;
+    position: relative;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    min-height: 440px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+    overflow: visible; /* allows flyout zoom to pop out smoothly */
+
+    &.single-media {
+      width: 100%;
+    }
+
+    @media (max-width: 768px) {
+      min-height: 340px;
+      padding: 16px;
+    }
+
+    /* Discount Badge */
+    .amazon-discount-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 11px;
+      border-radius: 999px;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+    }
+
+    /* Counter Badge */
+    .amazon-counter-badge {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Main Image Container & Magnifier Lens */
+    .main-image-container {
+      position: relative;
+      width: 100%;
+      height: 380px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      @media (max-width: 768px) {
+        height: 290px;
+      }
+
+      .image-zoom-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 100%;
+        max-height: 100%;
+        cursor: crosshair;
+        user-select: none;
+
+        @media (max-width: 768px) {
+          cursor: pointer;
+        }
+
+        .amazon-main-image {
+          max-width: 100%;
+          max-height: 380px;
+          object-fit: contain;
+          user-select: none;
+          display: block;
+          transition: transform 0.2s ease;
+
+          @media (max-width: 768px) {
+            max-height: 290px;
+          }
+        }
+
+        /* Amazon Hover Rectangular Lens (Pixel-perfect cursor-centered alignment) */
+        .amazon-zoom-lens {
+          position: absolute;
+          top: 0;
+          left: 0;
+          background: rgba(255, 255, 255, 0.42);
+          backdrop-filter: blur(1.5px);
+          border: 1.5px solid rgba(0, 87, 194, 0.55);
+          box-shadow: 0 0 12px rgba(0, 87, 194, 0.2), inset 0 0 10px rgba(255, 255, 255, 0.7);
+          pointer-events: none;
+          z-index: 15;
+          border-radius: 8px;
+
+          /* Subtle reticle indicator in center of lens */
+          &::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(0, 87, 194, 0.75);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+            pointer-events: none;
+          }
+
+          @media (max-width: 1024px) {
+            display: none; /* Mobile/tablet use full lightbox */
+          }
+        }
+      }
+    }
+
+    /* ================= VIDEO STAGE ================= */
+    .amazon-video-stage {
+      width: 100%;
+      height: 380px;
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #090d16;
+      display: flex;
+      flex-direction: column;
+
+      @media (max-width: 768px) {
+        height: 280px;
+      }
+
+      .direct-video-wrapper {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .native-video-player {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+      }
+
+      .embed-video-iframe {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+      .video-overlay-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.85) 100%);
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 10;
+
+        .video-title-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 700;
+
+          svg {
+            color: #f59e0b;
+          }
+        }
+
+        .back-to-images-btn {
+          background: rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(4px);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          color: #ffffff;
+          font-size: 11.5px;
+          font-weight: 700;
+          font-family: inherit;
+          padding: 4px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+
+          &:hover {
+            background: #ffffff;
+            color: #0f172a;
+          }
+        }
+      }
+    }
+
+    /* Floating Navigation Arrows */
+    .stage-nav-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #dbeafe;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+      transition: all 0.2s ease;
+      opacity: 0;
+      z-index: 12;
+
+      &:hover {
+        background: #1d4ed8;
+        color: #ffffff;
+        border-color: #1d4ed8;
+        transform: translateY(-50%) scale(1.08);
+      }
+
+      &.arrow-prev {
+        right: 12px;
+      }
+      &.arrow-next {
+        left: 12px;
+      }
+    }
+
+    &:hover .stage-nav-arrow {
+      opacity: 1;
+    }
+
+    /* Amazon Bottom Hint Text */
+    .amazon-zoom-hint {
+      margin-top: 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: color 0.15s ease;
+
+      &:hover {
+        color: #1d4ed8;
+      }
+    }
+
+    /* Fullscreen Expand Button */
+    .amazon-expand-btn {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      z-index: 10;
+
+      &:hover {
+        background: #1d4ed8;
+        color: #ffffff;
+        border-color: #1d4ed8;
+      }
+    }
+
+    /* ================= 3. AMAZON ULTRA-HD FLYOUT ZOOM WINDOW ================= */
+    .amazon-flyout-zoom {
+      position: absolute;
+      /* In RTL layout: Main image is on the right, Info column is on the left.
+         So flyout opens to the left (over the details column) */
+      right: calc(100% + 20px);
+      top: 0;
+      width: 530px;
+      height: 480px;
+      background-color: #ffffff;
+      border: 1.5px solid #d5d9d9;
+      border-radius: 16px;
+      box-shadow: 0 16px 45px rgba(15, 23, 42, 0.22);
+      z-index: 999;
+      pointer-events: none;
+      animation: amazonFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+
+      [dir="ltr"] & {
+        right: auto;
+        left: calc(100% + 20px);
+      }
+
+      @media (max-width: 1180px) {
+        width: 440px;
+        height: 420px;
+      }
+
+      @media (max-width: 1024px) {
+        display: none !important; /* disabled on tablet/mobile */
+      }
+
+      .flyout-zoom-header {
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        background: rgba(15, 23, 42, 0.75);
+        backdrop-filter: blur(4px);
+        color: #ffffff;
+        font-size: 10.5px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+    }
+  }
+
+  @keyframes amazonFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* ================= 4. AMAZON FULLSCREEN LIGHTBOX MODAL ================= */
+  .amazon-lightbox-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(8px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: amazonBackdropIn 0.2s ease-out;
+
+    .amazon-lightbox-container {
+      width: 95vw;
+      max-width: 1100px;
+      height: 90vh;
+      background: #ffffff;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+
+      .lightbox-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #f8fafc;
+
+        .lightbox-title-area {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+
+          h4 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+
+          .lightbox-sku {
+            background: #e2e8f0;
+            color: #475569;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+          }
+
+          .lightbox-counter {
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 700;
+          }
+        }
+
+        .lightbox-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .lb-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+
+            &:hover {
+              background: #f1f5f9;
+              color: #0f172a;
+              border-color: #94a3b8;
+            }
+          }
+
+          .lb-close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: #fee2e2;
+            color: #dc2626;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-right: 6px;
+
+            &:hover {
+              background: #dc2626;
+              color: #ffffff;
+            }
+          }
+        }
+      }
+
+      .lightbox-viewport {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        overflow: hidden;
+        padding: 20px;
+
+        .lb-nav-arrow {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 46px;
+          height: 46px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid #e2e8f0;
+          color: #0f172a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+          z-index: 20;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: #1d4ed8;
+            color: #ffffff;
+            border-color: #1d4ed8;
+            transform: translateY(-50%) scale(1.08);
+          }
+
+          &.lb-prev {
+            right: 20px;
+          }
+          &.lb-next {
+            left: 20px;
+          }
+        }
+
+        .lightbox-media-wrapper {
+          max-width: 90%;
+          max-height: 90%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          .lb-active-img {
+            max-width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
+          }
+
+          .lb-active-video {
+            max-width: 100%;
+            max-height: 62vh;
+            border-radius: 12px;
+          }
+
+          .lb-active-iframe {
+            width: 780px;
+            height: 480px;
+            max-width: 85vw;
+            max-height: 60vh;
+            border: none;
+            border-radius: 12px;
+          }
+        }
+      }
+
+      .lightbox-thumbs-bar {
+        padding: 12px 20px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        overflow-x: auto;
+
+        .lb-thumb {
+          position: relative;
+          width: 58px;
+          height: 58px;
+          border-radius: 8px;
+          border: 1.5px solid #cbd5e1;
+          background: #ffffff;
+          padding: 3px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.15s ease;
+
+          img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+
+            &.thumb-video-img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+          }
+
+          .thumb-video-element {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+          }
+
+          &.active {
+            border-color: #e77600;
+            border-width: 2px;
+            box-shadow: 0 0 0 1px #e77600;
+          }
+
+          .lb-video-pill {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: rgba(15, 23, 42, 0.85);
+            color: #f59e0b;
+            border-radius: 4px;
+            padding: 2px 4px;
+            display: flex;
+            align-items: center;
+          }
+        }
+      }
+    }
+  }
+
+  @keyframes amazonBackdropIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}

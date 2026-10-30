@@ -6,4 +6,5 @@ export { default as AdminStatusBadge } from './AdminStatusBadge';
 export { default as AdminModal } from './AdminModal';
 export { default as CustomSelect, OptionIconRenderer } from './CustomSelect/CustomSelect';
 export { default as QuillEditor } from './QuillEditor/QuillEditor';
+export { default as ProductShowcaseStudio, DEFAULT_SHOWCASE_TABS, renderPillarIcon, ICON_PRESETS } from './ProductShowcaseStudio/ProductShowcaseStudio';
 export { ToastProvider, useToast } from '@/src/context/ToastContext';

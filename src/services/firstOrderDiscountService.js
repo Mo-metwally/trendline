@@ -60,6 +60,25 @@ class FirstOrderDiscountService {
       return { valid: false, discount_amount: 0, message: 'Coupon usage limit has been reached' };
     }
 
+    // Check per_user_limit based on customer_phone in previous non-cancelled orders
+    if (coupon.per_user_limit && Number(coupon.per_user_limit) > 0 && phone) {
+      const formattedPhone = phone.trim();
+      const customerCouponOrdersCount = await Order.count({
+        where: {
+          customer_phone: formattedPhone,
+          coupon_code: { [Op.iLike]: coupon.code },
+          order_status: { [Op.ne]: 'cancelled' },
+        },
+      });
+      if (customerCouponOrdersCount >= Number(coupon.per_user_limit)) {
+        return {
+          valid: false,
+          discount_amount: 0,
+          message: `لقد وصلت للحد الأقصى المسموح به لاستخدام هذا الكوبون (${coupon.per_user_limit} مرة لهذا الرقم)`,
+        };
+      }
+    }
+
     if (coupon.min_order_value && Number(subtotal) < Number(coupon.min_order_value)) {
       return {
         valid: false,

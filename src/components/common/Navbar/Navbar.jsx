@@ -3,14 +3,19 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { getApiHost } from '@/src/utils/apiConfig';
+import { getInitialLang, setAppLang } from '@/src/hooks/useTrendlineLang';
 import './Navbar.scss';
 
-export default function Navbar({ lang = 'ar' }) {
+export default function Navbar({ lang = 'ar', onToggleLang }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { data: session, status } = useSession();
 
+  const [currentLang, setCurrentLang] = useState(lang || 'ar');
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [categoriesDropdownOpen, setCategoriesDropdownOpen] = useState(false);
@@ -19,6 +24,64 @@ export default function Navbar({ lang = 'ar' }) {
   const [cartCount] = useState(0);
 
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (lang && (lang === 'ar' || lang === 'en')) {
+      setCurrentLang(lang);
+    }
+  }, [lang]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const initial = getInitialLang();
+    if (initial === 'ar' || initial === 'en') {
+      setCurrentLang(initial);
+    }
+
+    const handleLangSync = (e) => {
+      const next = e?.detail || getInitialLang() || 'ar';
+      if (next === 'ar' || next === 'en') {
+        setCurrentLang(next);
+      }
+    };
+
+    window.addEventListener('trendline_lang_changed', handleLangSync);
+    window.addEventListener('storage', handleLangSync);
+    return () => {
+      window.removeEventListener('trendline_lang_changed', handleLangSync);
+      window.removeEventListener('storage', handleLangSync);
+    };
+  }, []);
+
+  // Detect if Admin is logged in (NextAuth session, JWT cookie, or localStorage token)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hasTokenCookie = document.cookie
+      .split('; ')
+      .some(
+        (row) =>
+          (row.startsWith('token=') && row.split('=')[1] && row.split('=')[1] !== 'null') ||
+          (row.startsWith('trendline_token=') && row.split('=')[1] && row.split('=')[1] !== 'null') ||
+          row.startsWith('next-auth.session-token=') ||
+          row.startsWith('__Secure-next-auth.session-token=')
+      );
+    const localToken = localStorage.getItem('trendline_admin_token');
+    const localUser = localStorage.getItem('trendline_admin_user');
+    const hasValidLocal =
+      (localToken && localToken !== 'undefined' && localToken !== 'null') ||
+      (localUser && localUser !== 'undefined' && localUser !== 'null');
+
+    setIsAdminLoggedIn(status === 'authenticated' || Boolean(session?.user) || hasTokenCookie || Boolean(hasValidLocal));
+  }, [status, session, pathname]);
+
+  const handleToggleLanguage = () => {
+    const nextLang = currentLang === 'ar' ? 'en' : 'ar';
+    setCurrentLang(nextLang);
+    setAppLang(nextLang);
+    if (typeof onToggleLang === 'function') {
+      onToggleLang(nextLang);
+    }
+  };
 
   // Handle scroll effect for glassmorphism elevation
   useEffect(() => {
@@ -82,10 +145,14 @@ export default function Navbar({ lang = 'ar' }) {
     }
   };
 
-  const isRtl = lang === 'ar';
+  const isRtl = currentLang === 'ar';
 
   return (
-    <header className={`trendline-navbar-wrapper ${isScrolled ? 'scrolled' : ''}`} dir={isRtl ? 'rtl' : 'ltr'}>
+    <header
+      suppressHydrationWarning
+      className={`trendline-navbar-wrapper ${isScrolled ? 'scrolled' : ''}`}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* ---------------- Upper Bar ---------------- */}
       <div className="navbar-upper-bar">
         {/* Brand Logo Area */}
@@ -123,28 +190,46 @@ export default function Navbar({ lang = 'ar' }) {
 
         {/* User Actions & Cart */}
         <div className="nav-user-actions">
-          {/* Login Link */}
-          <Link href="/admin/login" className="user-link-item">
+          {/* Language Switcher Button */}
+          <button
+            type="button"
+            className="user-link-item lang-switch-btn"
+            onClick={handleToggleLanguage}
+            title={isRtl ? 'Switch to English' : 'التبديل إلى العربية'}
+          >
             <span className="link-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v3h20v-3c0-3.33-6.67-5-10-5z" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
               </svg>
             </span>
-            <span>{isRtl ? 'تسجيل الدخول' : 'Sign In'}</span>
-          </Link>
+            <span>{isRtl ? 'English' : 'العربية'}</span>
+          </button>
 
-          {/* Register Link */}
-          <Link href="/register" className="user-link-item">
-            <span className="link-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="8.5" cy="7" r="4" />
-                <line x1="20" y1="8" x2="20" y2="14" />
-                <line x1="23" y1="11" x2="17" y2="11" />
-              </svg>
-            </span>
-            <span>{isRtl ? 'إنشاء حساب' : 'Register'}</span>
-          </Link>
+          {/* Conditional Action: Dashboard (if Admin Logged In) OR Contact Us */}
+          {isAdminLoggedIn ? (
+            <Link href="/admin" className="user-link-item admin-dashboard-btn">
+              <span className="link-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                  <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                  <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                  <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                </svg>
+              </span>
+              <span>{isRtl ? 'لوحة التحكم' : 'Dashboard'}</span>
+            </Link>
+          ) : (
+            <Link href="/contact" className="user-link-item contact-us-btn">
+              <span className="link-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                </svg>
+              </span>
+              <span>{isRtl ? 'تواصل معنا' : 'Contact Us'}</span>
+            </Link>
+          )}
 
           {/* Shopping Cart Icon with Badge */}
           <Link href="/cart" className="cart-btn-wrapper" aria-label="Shopping Cart">
@@ -238,7 +323,7 @@ export default function Navbar({ lang = 'ar' }) {
                   categories.map((cat) => (
                     <Link
                       key={cat.id}
-                      href={`/categories/${cat.slug || cat.id}`}
+                      href={`/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`}
                       className="dropdown-category-link"
                       onClick={() => setCategoriesDropdownOpen(false)}
                     >

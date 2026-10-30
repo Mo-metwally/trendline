@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-let apiBridgeInstance: any = null;
 async function getApiBridge() {
-  if (!apiBridgeInstance) {
-    const mod = await import('@/src/lib/apiBridge');
-    apiBridgeInstance = mod.default || mod;
-  }
-  return apiBridgeInstance;
+  const mod = await import('@/src/lib/apiBridge');
+  return mod.default || mod;
 }
 
 async function handle(request: NextRequest) {

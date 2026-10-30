@@ -7,6 +7,8 @@ const { permitRoles } = require('../middleware/rbacMiddleware');
 // Storefront & Public Catalog Endpoints
 router.get('/products', CatalogController.getProducts);
 router.get('/products/analytics', CatalogController.getProductAnalytics);
+router.get('/products/generate-codes', CatalogController.generateProductCodes);
+router.get('/products/check-unique', CatalogController.checkProductUnique);
 router.get('/home-categories', CatalogController.getHomeCategories);
 router.get('/products/:identifier', CatalogController.getProductByIdentifier);
 router.get('/categories', CatalogController.getAllCategories);
@@ -15,6 +17,7 @@ router.get('/categories/:id', CatalogController.getCategoryById);
 router.get('/brands', CatalogController.getBrands);
 router.get('/tags', CatalogController.getTags);
 router.get('/bundles', CatalogController.getBundles);
+router.get('/bundles/:id', CatalogController.getBundleById);
 router.post('/reviews', CatalogController.submitReview);
 
 // Admin & ERP Product Endpoints
@@ -23,6 +26,13 @@ router.post(
   authMiddleware,
   permitRoles('super_admin', 'erp_manager'),
   CatalogController.createProduct
+);
+
+router.put(
+  '/products/:id',
+  authMiddleware,
+  permitRoles('super_admin', 'erp_manager'),
+  CatalogController.updateProduct
 );
 
 router.patch(
@@ -142,6 +152,27 @@ router.post(
   authMiddleware,
   permitRoles('super_admin', 'erp_manager'),
   CatalogController.createBundle
+);
+
+router.put(
+  '/bundles/:id',
+  authMiddleware,
+  permitRoles('super_admin', 'erp_manager'),
+  CatalogController.updateBundle
+);
+
+router.patch(
+  '/bundles/:id/toggle',
+  authMiddleware,
+  permitRoles('super_admin', 'erp_manager'),
+  CatalogController.toggleBundleStatus
+);
+
+router.delete(
+  '/bundles/:id',
+  authMiddleware,
+  permitRoles('super_admin', 'erp_manager'),
+  CatalogController.deleteBundle
 );
 
 module.exports = router;

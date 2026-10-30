@@ -427,7 +427,7 @@ export default function AddCategoryPage() {
   };
 
   return (
-    <div className="add-category-page" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="add-category-page" dir={isRtl ? 'rtl' : 'ltr'} suppressHydrationWarning>
       {/* 1. Sidebar */}
       <AdminSidebar
         isCollapsed={sidebarCollapsed}
@@ -436,7 +436,7 @@ export default function AddCategoryPage() {
       />
 
       {/* Main Wrapper */}
-      <div className="add-category-wrapper">
+      <div className={`add-category-wrapper ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {/* 2. Header */}
         <AdminHeader
           adminUser={adminUser}

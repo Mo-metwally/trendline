@@ -8,7 +8,7 @@ const BundleItem = sequelize.define('BundleItem', {
     autoIncrement: true,
   },
   bundle_id: {
-    type: DataTypes.BIGINT,
+    type: DataTypes.STRING(50),
     allowNull: false,
     references: {
       model: 'bundles',

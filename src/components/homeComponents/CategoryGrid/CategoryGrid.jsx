@@ -148,7 +148,10 @@ export default function CategoryGrid({ lang = 'ar' }) {
               <div key={cat.id || idx} className="category-card-box">
                 {/* Header with Title and Icon */}
                 <div className="card-header-bar">
-                  <Link href={`/categories/${cat.slug || cat.id}`} className="cat-name">
+                  <Link
+                    href={`/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`}
+                    className="cat-name"
+                  >
                     {catName}
                   </Link>
 
@@ -181,12 +184,12 @@ export default function CategoryGrid({ lang = 'ar' }) {
                 <div className="products-quad-grid">
                   {products.map((p, pIdx) => {
                     const prodName = isRtl ? (p.name_ar || p.name) : (p.name_en || p.name);
-                    const formattedPrice = Number(p.sale_price || 0).toLocaleString();
+                    const formattedPrice = Number(p.sale_price || p.original_price || 0).toLocaleString();
 
                     return (
                       <Link
                         key={p.id || pIdx}
-                        href={`/products/${p.slug || p.id}`}
+                        href={`/pd/${encodeURIComponent(p.id)}/${encodeURIComponent(p.slug || p.id)}`}
                         className="product-quad-cell"
                       >
                         <div className="img-wrap">

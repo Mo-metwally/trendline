@@ -59,6 +59,11 @@ const Product = sequelize.define('Product', {
     type: DataTypes.JSONB,
     allowNull: true,
   },
+  showcase_tabs: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: null,
+  },
   video_urls: {
     type: DataTypes.JSONB,
     allowNull: true,

@@ -146,9 +146,129 @@ async function generateProductId(models, transaction = null) {
   return fallback;
 }
 
+/**
+ * Generate a unique Bundle ID:
+ * Format: 7-8 characters URL-safe Base64 string [A-Za-z0-9_-]
+ *
+ * @param {object} models - Sequelize models object { Bundle }
+ * @param {object} [transaction] - Optional Sequelize transaction
+ * @returns {Promise<string>} Unique bundle ID
+ */
+async function generateBundleId(models, transaction = null) {
+  const { Bundle } = models;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+  let attempts = 0;
+  while (attempts < 20) {
+    let suffix = '';
+    const randomBytes = crypto.randomBytes(6);
+    for (let i = 0; i < 6; i++) {
+      suffix += chars[randomBytes[i] % chars.length];
+    }
+    const candidateId = `BND-${suffix}`;
+
+    const exists = await Bundle.findByPk(candidateId, { transaction });
+    if (!exists) {
+      return candidateId;
+    }
+    attempts++;
+  }
+
+  return `BND-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+}
+
+/**
+ * Calculate standard GS1 EAN-13 Check Digit
+ * @param {string} code12 - 12-digit string
+ * @returns {number} Check digit 0-9
+ */
+function calculateEAN13CheckDigit(code12) {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const digit = parseInt(code12[i], 10);
+    sum += (i % 2 === 0) ? digit : digit * 3;
+  }
+  return (10 - (sum % 10)) % 10;
+}
+
+/**
+ * Generate a guaranteed unique valid EAN-13 Barcode
+ * Format: 622 (GS1 Egypt) + 9 random digits + 1 check digit = 13 digits
+ *
+ * @param {object} models - Sequelize models object { Product }
+ * @param {object} [transaction] - Optional Sequelize transaction
+ * @returns {Promise<string>} 13-digit EAN-13 barcode
+ */
+async function generateProductBarcodeEAN13(models, transaction = null) {
+  const { Product } = models;
+  const prefix = '622';
+
+  for (let attempts = 0; attempts < 50; attempts++) {
+    let code12 = prefix;
+    for (let i = 0; i < 9; i++) {
+      code12 += Math.floor(Math.random() * 10);
+    }
+    const checkDigit = calculateEAN13CheckDigit(code12);
+    const candidateBarcode = `${code12}${checkDigit}`;
+
+    const exists = await Product.findOne({
+      where: { barcode: candidateBarcode },
+      attributes: ['id'],
+      transaction,
+    });
+    if (!exists) {
+      return candidateBarcode;
+    }
+  }
+
+  // Fallback timestamp-based 12 digits
+  const timePart = String(Date.now()).slice(-9);
+  const code12 = `${prefix}${timePart}`;
+  return `${code12}${calculateEAN13CheckDigit(code12)}`;
+}
+
+/**
+ * Generate a guaranteed unique Product SKU:
+ * Format: TRD-[CAT]-XXXXX (5 digits/chars)
+ *
+ * @param {object} models - Sequelize models object { Product }
+ * @param {string} [categoryCode] - Optional category abbreviation (default 'GEN')
+ * @param {object} [transaction] - Optional Sequelize transaction
+ * @returns {Promise<string>} Unique SKU code
+ */
+async function generateProductSku(models, categoryCode = 'GEN', transaction = null) {
+  const { Product } = models;
+  const prefix = 'TRD';
+  const cleanCat = String(categoryCode || 'GEN')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 4)
+    .toUpperCase() || 'GEN';
+
+  for (let attempts = 0; attempts < 50; attempts++) {
+    const rand = Math.floor(10000 + Math.random() * 90000);
+    const candidateSku = `${prefix}-${cleanCat}-${rand}`;
+
+    const exists = await Product.findOne({
+      where: { sku: candidateSku },
+      attributes: ['id'],
+      transaction,
+    });
+    if (!exists) {
+      return candidateSku;
+    }
+  }
+
+  const fallbackRand = crypto.randomBytes(3).toString('hex').toUpperCase();
+  return `${prefix}-${cleanCat}-${fallbackRand}`;
+}
+
 module.exports = {
   indexToLetterId,
   letterIdToIndex,
   generateCategoryId,
   generateProductId,
+  generateBundleId,
+  calculateEAN13CheckDigit,
+  generateProductBarcodeEAN13,
+  generateProductSku,
 };

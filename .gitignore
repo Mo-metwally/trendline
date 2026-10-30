@@ -39,7 +39,8 @@ yarn-error.log*
 *.mkv
 # vercel
 .vercel
-
+public/uploads
+public/assets
 # typescript
 *.tsbuildinfo
 next-env.d.ts

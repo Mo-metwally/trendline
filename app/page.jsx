@@ -7,12 +7,12 @@ import Navbar from '@/src/components/common/Navbar/Navbar';
 import HeroSlider from '@/src/components/homeComponents/HeroSlider/HeroSlider';
 import ImageSlider from '@/src/components/homeComponents/ImageSlider/ImageSlider';
 import CategoryGrid from '@/src/components/homeComponents/CategoryGrid/CategoryGrid';
+import { useTrendlineLang } from '@/src/hooks/useTrendlineLang';
 import { getApiHost } from '@/src/utils/apiConfig';
 import './Home.scss';
 
 export default function HomePage() {
-  const [lang, setLang] = useState('ar');
-  const isRtl = lang === 'ar';
+  const { lang, isRtl, setLang } = useTrendlineLang();
 
   const [sliderSettings, setSliderSettings] = useState({
     mode: 'both', // 'both' | 'store_only' | 'image_only' | 'none'
@@ -80,7 +80,7 @@ export default function HomePage() {
   return (
     <div className="home-page-container" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* 1. Glassmorphic Storefront Navbar */}
-      <Navbar lang={lang} />
+      <Navbar lang={lang} onToggleLang={setLang} />
 
       {/* Main Content Flow */}
       <main className="main-home-flow">
