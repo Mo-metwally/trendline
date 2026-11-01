@@ -461,7 +461,7 @@ function SingleCategoryContent() {
               {availableBrands.length > 0 && (
                 <span className="meta-pill">
                   <FaTag size={11} />
-                  <strong>{availableBrands.length}</strong> ماركة عالمية
+                  <strong>{availableBrands.length}</strong> {isRtl ? 'ماركة عالمية' : 'Global Brands'}
                 </span>
               )}
             </div>
@@ -469,10 +469,12 @@ function SingleCategoryContent() {
 
           <div className="slim-main-row">
             <div className="slim-title-wrap">
-              <h1>{category.name_ar || category.name_en}</h1>
+              <h1>{isRtl ? (category.name_ar || category.name_en) : (category.name_en || category.name_ar)}</h1>
               {(category.description_ar || category.description_en) && (
                 <span className="slim-subtitle">
-                  {category.description_ar || category.description_en}
+                  {isRtl
+                    ? (category.description_ar || category.description_en)
+                    : (category.description_en || category.description_ar)}
                 </span>
               )}
             </div>
@@ -487,7 +489,7 @@ function SingleCategoryContent() {
                       className={`slim-pill ${selectedSubcat === 'all' ? 'active' : ''}`}
                       onClick={() => setSelectedSubcat('all')}
                     >
-                      <span>الكل</span>
+                      <span>{isRtl ? 'الكل' : 'All'}</span>
                       <span className="cnt">{products.length}</span>
                     </button>
                     {navSubcategories.map((sub) => {
@@ -505,7 +507,7 @@ function SingleCategoryContent() {
                             )
                           }
                         >
-                          <span>{sub.name_ar || sub.name_en}</span>
+                          <span>{isRtl ? (sub.name_ar || sub.name_en) : (sub.name_en || sub.name_ar)}</span>
                           <span className="cnt">{subCount || sub.products_count || 0}</span>
                         </button>
                       );
@@ -518,7 +520,11 @@ function SingleCategoryContent() {
                         href={`/categories/${encodeURIComponent(category.parent.id)}/${encodeURIComponent(category.parent.slug || category.parent.id)}`}
                         className="slim-pill"
                       >
-                        <span>كل {category.parent.name_ar}</span>
+                        <span>
+                          {isRtl
+                            ? `كل ${category.parent.name_ar || category.parent.name_en}`
+                            : `All ${category.parent.name_en || category.parent.name_ar}`}
+                        </span>
                       </Link>
                     )}
                     {navSubcategories.map((sub) => (
@@ -527,7 +533,7 @@ function SingleCategoryContent() {
                         href={`/categories/${encodeURIComponent(sub.id)}/${encodeURIComponent(sub.slug || sub.id)}`}
                         className={`slim-pill ${String(sub.id) === String(category.id) ? 'active' : ''}`}
                       >
-                        <span>{sub.name_ar || sub.name_en}</span>
+                        <span>{isRtl ? (sub.name_ar || sub.name_en) : (sub.name_en || sub.name_ar)}</span>
                         {sub.products_count !== undefined && (
                           <span className="cnt">{sub.products_count}</span>
                         )}
@@ -547,24 +553,28 @@ function SingleCategoryContent() {
             <div className="sidebar-head">
               <h4>
                 <FaFilter color="#1d4ed8" />
-                <span>فلترة وتصفية المنتجات</span>
+                <span>{isRtl ? 'فلترة وتصفية المنتجات' : 'Filter Products'}</span>
               </h4>
               {hasActiveFilters && (
                 <button type="button" className="reset-btn" onClick={handleResetFilters}>
-                  <FaRotateLeft style={{ marginLeft: '4px' }} />
-                  مسح الكل
+                  <FaRotateLeft style={{ marginLeft: isRtl ? '4px' : 0, marginRight: isRtl ? 0 : '4px' }} />
+                  {isRtl ? 'مسح الكل' : 'Clear All'}
                 </button>
               )}
             </div>
 
             {/* 1. Quick Search Inside Category */}
             <div className="filter-group">
-              <span className="fg-title">بحث سريع في القسم</span>
+              <span className="fg-title">{isRtl ? 'بحث سريع في القسم' : 'Search Category'}</span>
               <div className="sidebar-search-box">
                 <FaMagnifyingGlass className="s-ic" />
                 <input
                   type="text"
-                  placeholder={`ابحث في ${category.name_ar}...`}
+                  placeholder={
+                    isRtl
+                      ? `ابحث في ${category.name_ar || category.name_en}...`
+                      : `Search in ${category.name_en || category.name_ar}...`
+                  }
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -573,7 +583,7 @@ function SingleCategoryContent() {
                     type="button"
                     className="s-clear"
                     onClick={() => setSearchQuery('')}
-                    aria-label="مسح البحث"
+                    aria-label={isRtl ? 'مسح البحث' : 'Clear search'}
                   >
                     <FaXmark />
                   </button>
@@ -584,7 +594,7 @@ function SingleCategoryContent() {
             {/* 2. Subcategories Filter (if parent has subcategories) */}
             {!category.parent && navSubcategories.length > 0 && (
               <div className="filter-group">
-                <span className="fg-title">التصنيفات الفرعية</span>
+                <span className="fg-title">{isRtl ? 'التصنيفات الفرعية' : 'Subcategories'}</span>
                 <div className="fg-options">
                   <label className="fg-check-row">
                     <span className="label-left">
@@ -594,7 +604,11 @@ function SingleCategoryContent() {
                         checked={selectedSubcat === 'all'}
                         onChange={() => setSelectedSubcat('all')}
                       />
-                      <span>جميع منتجات {category.name_ar}</span>
+                      <span>
+                        {isRtl
+                          ? `جميع منتجات ${category.name_ar || category.name_en}`
+                          : `All ${category.name_en || category.name_ar} Products`}
+                      </span>
                     </span>
                     <span className="opt-count">{products.length}</span>
                   </label>
@@ -612,7 +626,7 @@ function SingleCategoryContent() {
                             checked={String(selectedSubcat) === String(sub.id)}
                             onChange={() => setSelectedSubcat(String(sub.id))}
                           />
-                          <span>{sub.name_ar || sub.name_en}</span>
+                          <span>{isRtl ? (sub.name_ar || sub.name_en) : (sub.name_en || sub.name_ar)}</span>
                         </span>
                         <span className="opt-count">{subCount || sub.products_count || 0}</span>
                       </label>
@@ -624,7 +638,7 @@ function SingleCategoryContent() {
 
             {/* 3. Availability & Special Offers */}
             <div className="filter-group">
-              <span className="fg-title">التوفر والعروض</span>
+              <span className="fg-title">{isRtl ? 'التوفر والعروض' : 'Availability & Offers'}</span>
               <div className="fg-options">
                 <label className="fg-check-row">
                   <span className="label-left">
@@ -633,7 +647,7 @@ function SingleCategoryContent() {
                       checked={inStockOnly}
                       onChange={(e) => setInStockOnly(e.target.checked)}
                     />
-                    <span>متوفر في المخزون فقط</span>
+                    <span>{isRtl ? 'متوفر في المخزون فقط' : 'In Stock Only'}</span>
                   </span>
                   <span className="opt-count">{filterCounts.inStock}</span>
                 </label>
@@ -645,7 +659,7 @@ function SingleCategoryContent() {
                       checked={onSaleOnly}
                       onChange={(e) => setOnSaleOnly(e.target.checked)}
                     />
-                    <span>عروض وخصومات فقط</span>
+                    <span>{isRtl ? 'عروض وخصومات فقط' : 'On Sale & Discounts Only'}</span>
                   </span>
                   <span className="opt-count">{filterCounts.onSale}</span>
                 </label>
@@ -657,7 +671,7 @@ function SingleCategoryContent() {
                       checked={featuredOnly}
                       onChange={(e) => setFeaturedOnly(e.target.checked)}
                     />
-                    <span>المنتجات الأكثر مبيعاً وتميزاً</span>
+                    <span>{isRtl ? 'المنتجات الأكثر مبيعاً وتميزاً' : 'Best Sellers & Featured'}</span>
                   </span>
                   <span className="opt-count">{filterCounts.featured}</span>
                 </label>
@@ -666,17 +680,17 @@ function SingleCategoryContent() {
 
             {/* 4. Price Range Filter + Quick Presets */}
             <div className="filter-group">
-              <span className="fg-title">نطاق السعر (ج.م)</span>
+              <span className="fg-title">{isRtl ? 'نطاق السعر (ج.م)' : `Price Range (${currencyLabel})`}</span>
               <div className="price-inputs-row">
                 <input
                   type="number"
-                  placeholder="من (الأقل)"
+                  placeholder={isRtl ? 'من (الأقل)' : 'Min'}
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
                 />
                 <input
                   type="number"
-                  placeholder="إلى (الأعلى)"
+                  placeholder={isRtl ? 'إلى (الأعلى)' : 'Max'}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
                 />
@@ -687,7 +701,7 @@ function SingleCategoryContent() {
                   className={minPrice === '' && maxPrice === '2000' ? 'active' : ''}
                   onClick={() => handleQuickPrice(null, 2000)}
                 >
-                  أقل من 2,000
+                  {isRtl ? 'أقل من 2,000' : 'Under 2,000'}
                 </button>
                 <button
                   type="button"
@@ -708,7 +722,7 @@ function SingleCategoryContent() {
                   className={minPrice === '15000' && maxPrice === '' ? 'active' : ''}
                   onClick={() => handleQuickPrice(15000, null)}
                 >
-                  +15,000 ج.م
+                  {isRtl ? '+15,000 ج.م' : `+15,000 ${currencyLabel}`}
                 </button>
               </div>
             </div>
@@ -716,7 +730,7 @@ function SingleCategoryContent() {
             {/* 5. Brand Filter */}
             {availableBrands.length > 0 && (
               <div className="filter-group">
-                <span className="fg-title">العلامة التجارية (البراند)</span>
+                <span className="fg-title">{isRtl ? 'العلامة التجارية (البراند)' : 'Brand'}</span>
                 <div className="fg-options">
                   <label className="fg-check-row">
                     <span className="label-left">
@@ -726,7 +740,7 @@ function SingleCategoryContent() {
                         checked={selectedBrand === 'all'}
                         onChange={() => setSelectedBrand('all')}
                       />
-                      <span>جميع العلامات التجارية</span>
+                      <span>{isRtl ? 'جميع العلامات التجارية' : 'All Brands'}</span>
                     </span>
                     <span className="opt-count">{products.length}</span>
                   </label>
@@ -751,7 +765,7 @@ function SingleCategoryContent() {
             {/* 6. Store Categories Directory Tree */}
             {rootCategories.length > 0 && (
               <div className="filter-group">
-                <span className="fg-title">تصفح أقسام المتجر</span>
+                <span className="fg-title">{isRtl ? 'تصفح أقسام المتجر' : 'Browse Categories'}</span>
                 <div className="sidebar-cat-tree">
                   {rootCategories.map((root) => {
                     const isCurrentRoot =
@@ -767,7 +781,7 @@ function SingleCategoryContent() {
                           style={{ textDecoration: 'none' }}
                         >
                           <span className="tree-lbl">
-                            <span>{root.name_ar || root.name_en}</span>
+                            <span>{isRtl ? (root.name_ar || root.name_en) : (root.name_en || root.name_ar)}</span>
                           </span>
                           {root.products_count !== undefined && (
                             <span className="tree-count">{root.products_count}</span>
@@ -783,7 +797,7 @@ function SingleCategoryContent() {
                                 className={`tree-sub-btn ${String(sub.id) === String(category.id) ? 'active' : ''}`}
                                 style={{ textDecoration: 'none' }}
                               >
-                                <span>{sub.name_ar || sub.name_en}</span>
+                                <span>{isRtl ? (sub.name_ar || sub.name_en) : (sub.name_en || sub.name_ar)}</span>
                                 {sub.products_count !== undefined && (
                                   <span className="sub-cnt">{sub.products_count}</span>
                                 )}
@@ -805,8 +819,17 @@ function SingleCategoryContent() {
             <div className="cat-toolbar">
               <div className="results-summary">
                 <span>
-                  عرض <strong>{filteredProducts.length}</strong> من أصل{' '}
-                  <strong>{products.length}</strong> منتج
+                  {isRtl ? (
+                    <>
+                      عرض <strong>{filteredProducts.length}</strong> من أصل{' '}
+                      <strong>{products.length}</strong> منتج
+                    </>
+                  ) : (
+                    <>
+                      Showing <strong>{filteredProducts.length}</strong> of{' '}
+                      <strong>{products.length}</strong> products
+                    </>
+                  )}
                 </span>
 
                 {selectedSubcat !== 'all' && (
@@ -815,9 +838,13 @@ function SingleCategoryContent() {
                     onClick={() => setSelectedSubcat('all')}
                   >
                     <span>
-                      الفرع:{' '}
-                      {navSubcategories.find((s) => String(s.id) === String(selectedSubcat))
-                        ?.name_ar || selectedSubcat}
+                      {isRtl ? 'الفرع: ' : 'Subcategory: '}
+                      {(() => {
+                        const subObj = navSubcategories.find((s) => String(s.id) === String(selectedSubcat));
+                        return subObj
+                          ? (isRtl ? (subObj.name_ar || subObj.name_en) : (subObj.name_en || subObj.name_ar))
+                          : selectedSubcat;
+                      })()}
                     </span>
                     <FaXmark size={11} />
                   </span>
@@ -829,7 +856,7 @@ function SingleCategoryContent() {
                     onClick={() => setSelectedBrand('all')}
                   >
                     <span>
-                      الماركة:{' '}
+                      {isRtl ? 'الماركة: ' : 'Brand: '}
                       {availableBrands.find((b) => String(b.id) === String(selectedBrand))
                         ?.name || selectedBrand}
                     </span>
@@ -846,7 +873,9 @@ function SingleCategoryContent() {
                     }}
                   >
                     <span>
-                      السعر: {minPrice || 0} - {maxPrice || '∞'} ج.م
+                      {isRtl
+                        ? `السعر: ${minPrice || 0} - ${maxPrice || '∞'} ج.م`
+                        : `Price: ${minPrice || 0} - ${maxPrice || '∞'} ${currencyLabel}`}
                     </span>
                     <FaXmark size={11} />
                   </span>
@@ -857,7 +886,7 @@ function SingleCategoryContent() {
                     className="active-filter-tag"
                     onClick={() => setOnSaleOnly(false)}
                   >
-                    <span>العروض والخصومات</span>
+                    <span>{isRtl ? 'العروض والخصومات' : 'On Sale'}</span>
                     <FaXmark size={11} />
                   </span>
                 )}
@@ -867,7 +896,7 @@ function SingleCategoryContent() {
                     className="active-filter-tag"
                     onClick={() => setInStockOnly(false)}
                   >
-                    <span>المتوفر فقط</span>
+                    <span>{isRtl ? 'المتوفر فقط' : 'In Stock'}</span>
                     <FaXmark size={11} />
                   </span>
                 )}
@@ -881,25 +910,25 @@ function SingleCategoryContent() {
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  title="عدد المنتجات في الصفحة"
+                  title={isRtl ? 'عدد المنتجات في الصفحة' : 'Products per page'}
                 >
-                  <option value={8}>8 منتجات / صفحة</option>
-                  <option value={12}>12 منتج / صفحة</option>
-                  <option value={24}>24 منتج / صفحة</option>
+                  <option value={8}>{isRtl ? '8 منتجات / صفحة' : '8 / page'}</option>
+                  <option value={12}>{isRtl ? '12 منتج / صفحة' : '12 / page'}</option>
+                  <option value={24}>{isRtl ? '24 منتج / صفحة' : '24 / page'}</option>
                 </select>
 
                 <select
                   className="sort-select"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  aria-label="ترتيب المنتجات"
+                  aria-label={isRtl ? 'ترتيب المنتجات' : 'Sort Products'}
                 >
-                  <option value="created_at_desc">الترتيب: الأحدث أولاً</option>
-                  <option value="price_asc">السعر: من الأقل للأعلى</option>
-                  <option value="price_desc">السعر: من الأعلى للأقل</option>
-                  <option value="discount_desc">الأعلى خصماً وتوفيراً</option>
-                  <option value="rating">الأعلى تقييماً</option>
-                  <option value="name_asc">الاسم (أ - ي)</option>
+                  <option value="created_at_desc">{isRtl ? 'الترتيب: الأحدث أولاً' : 'Sort: Newest First'}</option>
+                  <option value="price_asc">{isRtl ? 'السعر: من الأقل للأعلى' : 'Price: Low to High'}</option>
+                  <option value="price_desc">{isRtl ? 'السعر: من الأعلى للأقل' : 'Price: High to Low'}</option>
+                  <option value="discount_desc">{isRtl ? 'الأعلى خصماً وتوفيراً' : 'Biggest Discount'}</option>
+                  <option value="rating">{isRtl ? 'الأعلى تقييماً' : 'Top Rated'}</option>
+                  <option value="name_asc">{isRtl ? 'الاسم (أ - ي)' : 'Name (A - Z)'}</option>
                 </select>
 
                 <div className="view-mode-btns">
@@ -907,19 +936,19 @@ function SingleCategoryContent() {
                     type="button"
                     className={viewMode === 'grid' ? 'active' : ''}
                     onClick={() => setViewMode('grid')}
-                    title="عرض شبكي"
+                    title={isRtl ? 'عرض شبكي' : 'Grid View'}
                   >
                     <FaGrip />
-                    <span>شبكة</span>
+                    <span>{isRtl ? 'شبكة' : 'Grid'}</span>
                   </button>
                   <button
                     type="button"
                     className={viewMode === 'list' ? 'active' : ''}
                     onClick={() => setViewMode('list')}
-                    title="عرض قائمة"
+                    title={isRtl ? 'عرض قائمة' : 'List View'}
                   >
                     <FaList />
-                    <span>قائمة</span>
+                    <span>{isRtl ? 'قائمة' : 'List'}</span>
                   </button>
                 </div>
               </div>
@@ -931,16 +960,18 @@ function SingleCategoryContent() {
                 <div className="empty-icon">
                   <FaBoxOpen />
                 </div>
-                <h3>لا توجد منتجات مطابقة للفلاتر المختارة</h3>
+                <h3>{isRtl ? 'لا توجد منتجات مطابقة للفلاتر المختارة' : 'No products match the selected filters'}</h3>
                 <p>
-                  جرّب تعديل معايير الفلترة في القائمة الجانبية أو مسح البحث لعرض جميع منتجات القسم.
+                  {isRtl
+                    ? 'جرّب تعديل معايير الفلترة في القائمة الجانبية أو مسح البحث لعرض جميع منتجات القسم.'
+                    : 'Try adjusting filter criteria in the sidebar or clearing search to view all products.'}
                 </p>
                 <button
                   type="button"
                   onClick={handleResetFilters}
                   className="clear-filters-btn"
                 >
-                  إعادة ضبط جميع الفلاتر ({products.length})
+                  {isRtl ? `إعادة ضبط جميع الفلاتر (${products.length})` : `Reset All Filters (${products.length})`}
                 </button>
               </div>
             ) : (
@@ -957,10 +988,19 @@ function SingleCategoryContent() {
                 </div>
 
                 {totalPages > 1 && (
-                  <nav className="ecom-pagination-bar" aria-label="تصفح صفحات القسم">
+                  <nav className="ecom-pagination-bar" aria-label={isRtl ? 'تصفح صفحات القسم' : 'Category Pagination'}>
                     <div className="pag-info">
-                      صفحة <strong>{currentPage}</strong> من <strong>{totalPages}</strong> — إجمالي{' '}
-                      <strong>{filteredProducts.length}</strong> منتج في القسم
+                      {isRtl ? (
+                        <>
+                          صفحة <strong>{currentPage}</strong> من <strong>{totalPages}</strong> — إجمالي{' '}
+                          <strong>{filteredProducts.length}</strong> منتج في القسم
+                        </>
+                      ) : (
+                        <>
+                          Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> — Total{' '}
+                          <strong>{filteredProducts.length}</strong> products
+                        </>
+                      )}
                     </div>
 
                     <div className="pag-controls">
@@ -970,8 +1010,8 @@ function SingleCategoryContent() {
                         disabled={currentPage <= 1}
                         onClick={() => handlePageChange(currentPage - 1)}
                       >
-                        <FaChevronRight size={11} />
-                        <span>السابق</span>
+                        {isRtl ? <FaChevronRight size={11} /> : <FaChevronLeft size={11} />}
+                        <span>{isRtl ? 'السابق' : 'Prev'}</span>
                       </button>
 
                       {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((num) => (
@@ -991,8 +1031,8 @@ function SingleCategoryContent() {
                         disabled={currentPage >= totalPages}
                         onClick={() => handlePageChange(currentPage + 1)}
                       >
-                        <span>التالي</span>
-                        <FaChevronLeft size={11} />
+                        <span>{isRtl ? 'التالي' : 'Next'}</span>
+                        {isRtl ? <FaChevronLeft size={11} /> : <FaChevronRight size={11} />}
                       </button>
                     </div>
                   </nav>
@@ -1012,10 +1052,10 @@ export default function SingleCategoryPage() {
   return (
     <Suspense
       fallback={
-        <div className="cats-page-wrapper" dir="rtl">
+        <div className="cats-page-wrapper">
           <div className="cats-container" style={{ paddingTop: '64px', textAlign: 'center' }}>
             <p style={{ fontSize: '18px', fontWeight: 800, color: '#1d4ed8' }}>
-              جاري تحميل صفحة القسم...
+              Loading...
             </p>
           </div>
         </div>

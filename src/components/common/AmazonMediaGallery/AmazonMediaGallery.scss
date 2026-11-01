@@ -207,8 +207,13 @@
     }
 
     @media (max-width: 768px) {
-      min-height: 340px;
-      padding: 16px;
+      min-height: 280px;
+      padding: 14px;
+    }
+
+    @media (max-width: 480px) {
+      min-height: 230px;
+      padding: 10px;
     }
 
     /* Discount Badge */
@@ -224,6 +229,13 @@
       padding: 4px 11px;
       border-radius: 999px;
       box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+
+      @media (max-width: 480px) {
+        top: 10px;
+        right: 10px;
+        font-size: 10.5px;
+        padding: 2.5px 8px;
+      }
     }
 
     /* Counter Badge */
@@ -239,6 +251,13 @@
       padding: 3px 9px;
       border-radius: 6px;
       border: 1px solid #e2e8f0;
+
+      @media (max-width: 480px) {
+        top: 10px;
+        left: 10px;
+        font-size: 10px;
+        padding: 2px 7px;
+      }
     }
 
     /* Main Image Container & Magnifier Lens */
@@ -251,7 +270,11 @@
       justify-content: center;
 
       @media (max-width: 768px) {
-        height: 290px;
+        height: 250px;
+      }
+
+      @media (max-width: 480px) {
+        height: 210px;
       }
 
       .image-zoom-wrapper {

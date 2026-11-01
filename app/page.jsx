@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Navbar from '@/src/components/common/Navbar/Navbar';
@@ -11,8 +11,8 @@ import { useTrendlineLang } from '@/src/hooks/useTrendlineLang';
 import { getApiHost } from '@/src/utils/apiConfig';
 import './Home.scss';
 
-export default function HomePage() {
-  const { lang, isRtl, setLang } = useTrendlineLang();
+function HomeContent() {
+  const { lang, isRtl, setLang, formatLangHref } = useTrendlineLang();
 
   const [sliderSettings, setSliderSettings] = useState({
     mode: 'both', // 'both' | 'store_only' | 'image_only' | 'none'
@@ -183,14 +183,39 @@ export default function HomePage() {
           </div>
 
           <div className="footer-links">
-            <Link href="/products">{isRtl ? 'جميع المنتجات' : 'All Products'}</Link>
-            <Link href="/categories">{isRtl ? 'الأقسام' : 'Categories'}</Link>
-            <Link href="/deals">{isRtl ? 'عروض خاصة' : 'Deals'}</Link>
-            <Link href="/track-order">{isRtl ? 'تتبع الطلب' : 'Track Order'}</Link>
+            <Link href={formatLangHref('/products')}>{isRtl ? 'جميع المنتجات' : 'All Products'}</Link>
+            <Link href={formatLangHref('/categories')}>{isRtl ? 'الأقسام' : 'Categories'}</Link>
+            <Link href={formatLangHref('/deals')}>{isRtl ? 'عروض خاصة' : 'Deals'}</Link>
+            <Link href={formatLangHref('/track-order')}>{isRtl ? 'تتبع الطلب' : 'Track Order'}</Link>
             <Link href="/admin/login">{isRtl ? 'بوابة الإدارة ERP' : 'Admin Portal'}</Link>
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#f8fafc',
+            fontFamily: 'Cairo, sans-serif',
+            fontWeight: 800,
+            color: '#1d4ed8',
+          }}
+        >
+          Trendline Systems...
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }

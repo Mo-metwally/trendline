@@ -82,9 +82,10 @@ export default function StoreProductCard({
     ? (product.short_desc_ar || product.description_ar || '')
     : (product.short_desc_en || product.description_en || product.short_desc_ar || product.description_ar || '');
 
-  const prodUrl = isPreview
+  const baseProdUrl = isPreview
     ? '#'
     : `/pd/${encodeURIComponent(product.id || '')}/${encodeURIComponent(product.slug || product.id || '')}`;
+  const prodUrl = !isRtl && baseProdUrl !== '#' ? `${baseProdUrl}?lang=en` : baseProdUrl;
 
   const handleShare = (e) => {
     e.preventDefault();

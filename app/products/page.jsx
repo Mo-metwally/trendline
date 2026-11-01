@@ -61,6 +61,35 @@ function AllProductsCatalogContent() {
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [sortBy, setSortBy] = useState('created_at_desc');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  // Prevent background scroll when mobile filter drawer is open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (isMobileFilterOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [isMobileFilterOpen]);
+
+  // Active filters count
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedCategory && selectedCategory !== 'all') count++;
+    if (selectedBrand && selectedBrand !== 'all') count++;
+    if (inStockOnly) count++;
+    if (onSaleOnly) count++;
+    if (minPrice || maxPrice) count++;
+    if (searchQuery && searchQuery.trim()) count++;
+    return count;
+  }, [selectedCategory, selectedBrand, inStockOnly, onSaleOnly, minPrice, maxPrice, searchQuery]);
 
   // Sync URL query params if user navigates via Navbar search
   useEffect(() => {
@@ -265,7 +294,7 @@ function AllProductsCatalogContent() {
     const shortUrl = `${window.location.origin}/pd/${encodeURIComponent(prod.id)}`;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(shortUrl);
-      toast.success(`تم نسخ الرابط القصير للمنتج: /pd/${prod.id}`);
+      toast.success(isRtl ? `تم نسخ الرابط القصير للمنتج: /pd/${prod.id}` : `Short link copied: /pd/${prod.id}`);
     }
   };
 
@@ -393,33 +422,50 @@ function AllProductsCatalogContent() {
           </div>
         </div>
 
+        {/* Mobile Filter Backdrop */}
+        <div
+          className={`mobile-filter-backdrop ${isMobileFilterOpen ? 'active' : ''}`}
+          onClick={() => setIsMobileFilterOpen(false)}
+          aria-hidden="true"
+        />
+
         {/* ================= MAIN WORKSPACE (SIDEBAR FILTERS + PAGINATED PRODUCTS) ================= */}
         <div className="single-cat-workspace">
           {/* Sidebar Filters */}
-          <aside className="cat-filters-sidebar">
+          <aside className={`cat-filters-sidebar ${isMobileFilterOpen ? 'mobile-filter-open' : ''}`}>
             <div className="sidebar-head">
               <h4>
                 <FaFilter color="#1d4ed8" />
                 <span>{isRtl ? 'تصفية المنتجات' : 'Filter Products'}</span>
               </h4>
-              <button
-                type="button"
-                className="reset-btn"
-                onClick={handleResetFilters}
-              >
-                <FaRotateLeft style={{ marginLeft: isRtl ? '4px' : 0, marginRight: isRtl ? 0 : '4px' }} />
-                {isRtl ? 'إعادة ضبط' : 'Reset'}
-              </button>
+              <div className="sidebar-head-actions">
+                <button
+                  type="button"
+                  className="reset-btn"
+                  onClick={handleResetFilters}
+                >
+                  <FaRotateLeft style={{ marginLeft: isRtl ? '4px' : 0, marginRight: isRtl ? 0 : '4px' }} />
+                  {isRtl ? 'إعادة ضبط' : 'Reset'}
+                </button>
+                <button
+                  type="button"
+                  className="mobile-close-filter-btn"
+                  onClick={() => setIsMobileFilterOpen(false)}
+                  aria-label={isRtl ? 'إغلاق الفلتر' : 'Close filters'}
+                >
+                  <FaXmark />
+                </button>
+              </div>
             </div>
 
             {/* 1. Search Input */}
             <div className="filter-group">
-              <span className="fg-title">بحث بالاسم أو الكود (SKU)</span>
+              <span className="fg-title">{isRtl ? 'بحث بالاسم أو الكود (SKU)' : 'Search by Name or SKU'}</span>
               <div className="sidebar-search-box">
                 <FaMagnifyingGlass className="s-ic" />
                 <input
                   type="text"
-                  placeholder="ابحث عن منتج، موديل، أو SKU..."
+                  placeholder={isRtl ? 'ابحث عن منتج، موديل، أو SKU...' : 'Search product, model, or SKU...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -428,6 +474,7 @@ function AllProductsCatalogContent() {
                     type="button"
                     className="s-clear"
                     onClick={() => setSearchQuery('')}
+                    aria-label={isRtl ? 'مسح البحث' : 'Clear search'}
                   >
                     <FaXmark />
                   </button>
@@ -437,7 +484,7 @@ function AllProductsCatalogContent() {
 
             {/* 2. Category Tree Filter */}
             <div className="filter-group">
-              <span className="fg-title">الأقسام والتصنيفات</span>
+              <span className="fg-title">{isRtl ? 'الأقسام والتصنيفات' : 'Categories'}</span>
               <div className="sidebar-cat-tree">
                 <div className="tree-root-item">
                   <button
@@ -446,7 +493,7 @@ function AllProductsCatalogContent() {
                     onClick={() => handleFilterChange(() => setSelectedCategory('all'))}
                   >
                     <span className="tree-lbl">
-                      <span>جميع الأقسام</span>
+                      <span>{isRtl ? 'جميع الأقسام' : 'All Categories'}</span>
                     </span>
                   </button>
                 </div>
@@ -467,7 +514,7 @@ function AllProductsCatalogContent() {
                         }
                       >
                         <span className="tree-lbl">
-                          <span>{root.name_ar || root.name_en}</span>
+                          <span>{isRtl ? (root.name_ar || root.name_en) : (root.name_en || root.name_ar)}</span>
                         </span>
                         {root.products_count !== undefined && (
                           <span className="tree-count">{root.products_count}</span>
@@ -488,7 +535,7 @@ function AllProductsCatalogContent() {
                                   handleFilterChange(() => setSelectedCategory(String(sub.id)))
                                 }
                               >
-                                <span>{sub.name_ar || sub.name_en}</span>
+                                <span>{isRtl ? (sub.name_ar || sub.name_en) : (sub.name_en || sub.name_ar)}</span>
                                 {sub.products_count !== undefined && (
                                   <span className="sub-cnt">{sub.products_count}</span>
                                 )}
@@ -505,7 +552,7 @@ function AllProductsCatalogContent() {
 
             {/* 3. Availability & Offers Filter */}
             <div className="filter-group">
-              <span className="fg-title">حالة التوفر والعروض</span>
+              <span className="fg-title">{isRtl ? 'حالة التوفر والعروض' : 'Availability & Offers'}</span>
               <div className="fg-options">
                 <label className="fg-check-row">
                   <span className="label-left">
@@ -516,7 +563,7 @@ function AllProductsCatalogContent() {
                         handleFilterChange(() => setInStockOnly(e.target.checked))
                       }
                     />
-                    <span>المتوفر في المخزون فقط</span>
+                    <span>{isRtl ? 'المتوفر في المخزون فقط' : 'In Stock Only'}</span>
                   </span>
                 </label>
                 <label className="fg-check-row">
@@ -528,7 +575,7 @@ function AllProductsCatalogContent() {
                         handleFilterChange(() => setOnSaleOnly(e.target.checked))
                       }
                     />
-                    <span>العروض والخصومات فقط</span>
+                    <span>{isRtl ? 'العروض والخصومات فقط' : 'On Sale & Discounts Only'}</span>
                   </span>
                 </label>
               </div>
@@ -536,11 +583,11 @@ function AllProductsCatalogContent() {
 
             {/* 4. Price Range Filter */}
             <div className="filter-group">
-              <span className="fg-title">نطاق السعر (ج.م)</span>
+              <span className="fg-title">{isRtl ? 'نطاق السعر (ج.م)' : `Price Range (${currencyLabel})`}</span>
               <div className="price-inputs-row">
                 <input
                   type="number"
-                  placeholder="من (الأقل)"
+                  placeholder={isRtl ? 'من (الأقل)' : 'Min'}
                   value={minPrice}
                   onChange={(e) =>
                     handleFilterChange(() => setMinPrice(e.target.value))
@@ -548,7 +595,7 @@ function AllProductsCatalogContent() {
                 />
                 <input
                   type="number"
-                  placeholder="إلى (الأعلى)"
+                  placeholder={isRtl ? 'إلى (الأعلى)' : 'Max'}
                   value={maxPrice}
                   onChange={(e) =>
                     handleFilterChange(() => setMaxPrice(e.target.value))
@@ -561,7 +608,7 @@ function AllProductsCatalogContent() {
                   className={minPrice === '' && maxPrice === '2000' ? 'active' : ''}
                   onClick={() => handleQuickPrice(null, 2000)}
                 >
-                  أقل من 2,000
+                  {isRtl ? 'أقل من 2,000' : 'Under 2,000'}
                 </button>
                 <button
                   type="button"
@@ -582,7 +629,7 @@ function AllProductsCatalogContent() {
                   className={minPrice === '15000' && maxPrice === '' ? 'active' : ''}
                   onClick={() => handleQuickPrice(15000, null)}
                 >
-                  +15,000 ج.م
+                  {isRtl ? '+15,000 ج.م' : `+15,000 ${currencyLabel}`}
                 </button>
               </div>
             </div>
@@ -590,7 +637,7 @@ function AllProductsCatalogContent() {
             {/* 5. Brands Filter */}
             {brands.length > 0 && (
               <div className="filter-group">
-                <span className="fg-title">العلامة التجارية</span>
+                <span className="fg-title">{isRtl ? 'العلامة التجارية' : 'Brand'}</span>
                 <div className="fg-options">
                   <label className="fg-check-row">
                     <span className="label-left">
@@ -602,7 +649,7 @@ function AllProductsCatalogContent() {
                           handleFilterChange(() => setSelectedBrand('all'))
                         }
                       />
-                      <span>جميع الماركات</span>
+                      <span>{isRtl ? 'جميع الماركات' : 'All Brands'}</span>
                     </span>
                   </label>
 
@@ -617,13 +664,24 @@ function AllProductsCatalogContent() {
                             handleFilterChange(() => setSelectedBrand(String(b.id)))
                           }
                         />
-                        <span>{b.name_en || b.name_ar}</span>
+                        <span>{isRtl ? (b.name_ar || b.name_en) : (b.name_en || b.name_ar)}</span>
                       </span>
                     </label>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Mobile Filter Apply Bar */}
+            <div className="mobile-filter-apply-bar">
+              <button
+                type="button"
+                className="apply-filter-action-btn"
+                onClick={() => setIsMobileFilterOpen(false)}
+              >
+                {isRtl ? `تطبيق وعرض (${totalProductsCount} منتج)` : `Apply & Show (${totalProductsCount} Products)`}
+              </button>
+            </div>
           </aside>
 
           {/* Main Products Column */}
@@ -631,9 +689,32 @@ function AllProductsCatalogContent() {
             {/* Top Sort, Page Size & View Mode Toolbar */}
             <div className="cat-toolbar">
               <div className="results-summary">
+                {/* Mobile Filter Toggle Button */}
+                <button
+                  type="button"
+                  className="mobile-filter-toggle-btn"
+                  onClick={() => setIsMobileFilterOpen(true)}
+                  aria-label={isRtl ? 'فتح فلاتر البحث' : 'Open search filters'}
+                >
+                  <FaFilter size={12} />
+                  <span>{isRtl ? 'تصفية وفلترة' : 'Filters'}</span>
+                  {activeFiltersCount > 0 && (
+                    <span className="filter-badge">{activeFiltersCount}</span>
+                  )}
+                </button>
+
                 <span>
-                  عرض <strong>{startItemIndex}</strong> - <strong>{endItemIndex}</strong> من أصل{' '}
-                  <strong>{totalProductsCount}</strong> منتج (صفحة {currentPage} من {totalPages})
+                  {isRtl ? (
+                    <>
+                      عرض <strong>{startItemIndex}</strong> - <strong>{endItemIndex}</strong> من أصل{' '}
+                      <strong>{totalProductsCount}</strong> منتج (صفحة {currentPage} من {totalPages})
+                    </>
+                  ) : (
+                    <>
+                      Showing <strong>{startItemIndex}</strong> - <strong>{endItemIndex}</strong> of{' '}
+                      <strong>{totalProductsCount}</strong> products (Page {currentPage} of {totalPages})
+                    </>
+                  )}
                 </span>
 
                 {activeCategoryObj && (
@@ -641,7 +722,11 @@ function AllProductsCatalogContent() {
                     className="active-filter-tag"
                     onClick={() => handleFilterChange(() => setSelectedCategory('all'))}
                   >
-                    <span>القسم: {activeCategoryObj.name_ar}</span>
+                    <span>
+                      {isRtl
+                        ? `القسم: ${activeCategoryObj.name_ar || activeCategoryObj.name_en}`
+                        : `Category: ${activeCategoryObj.name_en || activeCategoryObj.name_ar}`}
+                    </span>
                     <FaXmark size={11} />
                   </span>
                 )}
@@ -652,9 +737,13 @@ function AllProductsCatalogContent() {
                     onClick={() => handleFilterChange(() => setSelectedBrand('all'))}
                   >
                     <span>
-                      الماركة:{' '}
-                      {brands.find((b) => String(b.id) === String(selectedBrand))?.name_en ||
-                        selectedBrand}
+                      {isRtl ? 'الماركة: ' : 'Brand: '}
+                      {(() => {
+                        const brandObj = brands.find((b) => String(b.id) === String(selectedBrand));
+                        return brandObj
+                          ? (isRtl ? (brandObj.name_ar || brandObj.name_en) : (brandObj.name_en || brandObj.name_ar))
+                          : selectedBrand;
+                      })()}
                     </span>
                     <FaXmark size={11} />
                   </span>
@@ -666,7 +755,9 @@ function AllProductsCatalogContent() {
                     onClick={() => handleQuickPrice(null, null)}
                   >
                     <span>
-                      السعر: {minPrice || 0} - {maxPrice || '∞'} ج.م
+                      {isRtl
+                        ? `السعر: ${minPrice || 0} - ${maxPrice || '∞'} ج.م`
+                        : `Price: ${minPrice || 0} - ${maxPrice || '∞'} ${currencyLabel}`}
                     </span>
                     <FaXmark size={11} />
                   </span>
@@ -681,11 +772,11 @@ function AllProductsCatalogContent() {
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  title="عدد المنتجات في الصفحة"
+                  title={isRtl ? 'عدد المنتجات في الصفحة' : 'Products per page'}
                 >
-                  <option value={8}>8 منتجات / صفحة</option>
-                  <option value={12}>12 منتج / صفحة</option>
-                  <option value={24}>24 منتج / صفحة</option>
+                  <option value={8}>{isRtl ? '8 منتجات / صفحة' : '8 / page'}</option>
+                  <option value={12}>{isRtl ? '12 منتج / صفحة' : '12 / page'}</option>
+                  <option value={24}>{isRtl ? '24 منتج / صفحة' : '24 / page'}</option>
                 </select>
 
                 <select
@@ -695,13 +786,14 @@ function AllProductsCatalogContent() {
                     setSortBy(e.target.value);
                     setCurrentPage(1);
                   }}
+                  aria-label={isRtl ? 'ترتيب المنتجات' : 'Sort Products'}
                 >
-                  <option value="created_at_desc">الترتيب: الأحدث أولاً</option>
-                  <option value="price_asc">السعر: من الأقل للأعلى</option>
-                  <option value="price_desc">السعر: من الأعلى للأقل</option>
-                  <option value="discount_desc">الأعلى خصماً</option>
-                  <option value="rating">الأعلى تقييماً</option>
-                  <option value="name_asc">الاسم: أ - ي</option>
+                  <option value="created_at_desc">{isRtl ? 'الترتيب: الأحدث أولاً' : 'Sort: Newest First'}</option>
+                  <option value="price_asc">{isRtl ? 'السعر: من الأقل للأعلى' : 'Price: Low to High'}</option>
+                  <option value="price_desc">{isRtl ? 'السعر: من الأعلى للأقل' : 'Price: High to Low'}</option>
+                  <option value="discount_desc">{isRtl ? 'الأعلى خصماً' : 'Biggest Discount'}</option>
+                  <option value="rating">{isRtl ? 'الأعلى تقييماً' : 'Top Rated'}</option>
+                  <option value="name_asc">{isRtl ? 'الاسم: أ - ي' : 'Name: A - Z'}</option>
                 </select>
 
                 <div className="view-mode-btns">
@@ -709,7 +801,7 @@ function AllProductsCatalogContent() {
                     type="button"
                     className={viewMode === 'grid' ? 'active' : ''}
                     onClick={() => setViewMode('grid')}
-                    title="عرض شبكي"
+                    title={isRtl ? 'عرض شبكي' : 'Grid View'}
                   >
                     <FaGrip />
                   </button>
@@ -717,7 +809,7 @@ function AllProductsCatalogContent() {
                     type="button"
                     className={viewMode === 'list' ? 'active' : ''}
                     onClick={() => setViewMode('list')}
-                    title="عرض قائمة"
+                    title={isRtl ? 'عرض قائمة' : 'List View'}
                   >
                     <FaList />
                   </button>
@@ -737,7 +829,9 @@ function AllProductsCatalogContent() {
                 }}
               >
                 <p style={{ fontSize: '16px', fontWeight: 800, color: '#1d4ed8', margin: 0 }}>
-                  جاري تحميل صفحة {currentPage} من المنتجات...
+                  {isRtl
+                    ? `جاري تحميل صفحة ${currentPage} من المنتجات...`
+                    : `Loading products page ${currentPage}...`}
                 </p>
               </div>
             ) : products.length === 0 ? (
@@ -745,16 +839,18 @@ function AllProductsCatalogContent() {
                 <div className="empty-icon">
                   <FaBoxOpen />
                 </div>
-                <h3>لا توجد منتجات مطابقة للفلاتر المختارة</h3>
+                <h3>{isRtl ? 'لا توجد منتجات مطابقة للفلاتر المختارة' : 'No products found matching your filters'}</h3>
                 <p>
-                  جرّب تغيير معايير التصفية أو مسح البحث لاستعراض جميع منتجات المتجر.
+                  {isRtl
+                    ? 'جرّب تغيير معايير التصفية أو مسح البحث لاستعراض جميع منتجات المتجر.'
+                    : 'Try adjusting your filter criteria or clearing search to explore all products.'}
                 </p>
                 <button
                   type="button"
                   className="clear-filters-btn"
                   onClick={handleResetFilters}
                 >
-                  إعادة ضبط الفلاتر وعرض الكل
+                  {isRtl ? 'إعادة ضبط الفلاتر وعرض الكل' : 'Reset Filters & Show All'}
                 </button>
               </div>
             ) : (
@@ -772,11 +868,21 @@ function AllProductsCatalogContent() {
 
                 {/* ================= SERVER-SIDE PAGINATION BAR ================= */}
                 {totalPages > 1 && (
-                  <nav className="ecom-pagination-bar" aria-label="تصفح صفحات المنتجات">
+                  <nav className="ecom-pagination-bar" aria-label={isRtl ? 'تصفح صفحات المنتجات' : 'Products Pagination'}>
                     <div className="pag-info">
-                      عرض المنتجات <strong>{startItemIndex}</strong> إلى{' '}
-                      <strong>{endItemIndex}</strong> من إجمالي{' '}
-                      <strong>{totalProductsCount}</strong> منتج
+                      {isRtl ? (
+                        <>
+                          عرض المنتجات <strong>{startItemIndex}</strong> إلى{' '}
+                          <strong>{endItemIndex}</strong> من إجمالي{' '}
+                          <strong>{totalProductsCount}</strong> منتج
+                        </>
+                      ) : (
+                        <>
+                          Showing products <strong>{startItemIndex}</strong> to{' '}
+                          <strong>{endItemIndex}</strong> of{' '}
+                          <strong>{totalProductsCount}</strong>
+                        </>
+                      )}
                     </div>
 
                     <div className="pag-controls">
@@ -786,8 +892,8 @@ function AllProductsCatalogContent() {
                         disabled={currentPage <= 1}
                         onClick={() => handlePageChange(currentPage - 1)}
                       >
-                        <FaChevronRight size={11} />
-                        <span>السابق</span>
+                        {isRtl ? <FaChevronRight size={11} /> : <FaChevronLeft size={11} />}
+                        <span>{isRtl ? 'السابق' : 'Prev'}</span>
                       </button>
 
                       {pageNumbers[0] > 1 && (

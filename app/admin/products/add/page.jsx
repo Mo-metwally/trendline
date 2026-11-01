@@ -33,6 +33,7 @@ import {
   FaFilm,
   FaTrashCan,
   FaArrowsRotate,
+  FaBoxOpen,
   FaCircleCheck,
   FaPlay,
   FaPause,
@@ -542,8 +543,28 @@ export default function AddProductPage() {
     return () => { isMounted = false; };
   }, []);
 
+  // Dedicated Category Removal handler (Unconditionally removes ANY category, including legacy root categories)
+  const removeCategory = (categoryId, e) => {
+    if (e) e.stopPropagation();
+    setCategoryValidationError(false);
+    setSelectedCategoryIds((prev) => {
+      const updated = prev.filter((id) => String(id) !== String(categoryId));
+      if (String(primaryCategoryId) === String(categoryId)) {
+        setPrimaryCategoryId(updated.length > 0 ? updated[0] : '');
+      }
+      return updated;
+    });
+  };
+
   // Category Multi-selection handlers: Products can ONLY be assigned to subcategories
   const toggleCategorySelection = (categoryId) => {
+    // If it's already selected, ALWAYS allow removing it (even if it was a legacy root category)
+    const isCurrentlySelected = selectedCategoryIds.some((id) => String(id) === String(categoryId));
+    if (isCurrentlySelected) {
+      removeCategory(categoryId);
+      return;
+    }
+
     // Check if this category is a root category
     const isRoot = categoriesTree.some((root) => String(root.id) === String(categoryId));
     if (isRoot) {
@@ -558,19 +579,10 @@ export default function AddProductPage() {
 
     setCategoryValidationError(false);
     setSelectedCategoryIds((prev) => {
-      let updated;
-      if (prev.includes(categoryId)) {
-        updated = prev.filter((id) => id !== categoryId);
-        // If the deselected was the primary, reassign primary to first remaining
-        if (primaryCategoryId === categoryId) {
-          setPrimaryCategoryId(updated.length > 0 ? updated[0] : '');
-        }
-      } else {
-        updated = [...prev, categoryId];
-        // If no primary is set, make this newly selected one primary
-        if (!primaryCategoryId) {
-          setPrimaryCategoryId(categoryId);
-        }
+      const updated = [...prev, categoryId];
+      // If no primary is set, make this newly selected one primary
+      if (!primaryCategoryId) {
+        setPrimaryCategoryId(categoryId);
       }
       return updated;
     });
@@ -2084,9 +2096,35 @@ export default function AddProductPage() {
                           </p>
                         </div>
                       </div>
-                      <span className="scp-count-badge">
-                        {selectedCategoriesData.length} {isRtl ? 'أقسام محددة' : 'Selected'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="scp-count-badge">
+                          {selectedCategoriesData.length} {isRtl ? 'أقسام محددة' : 'Selected'}
+                        </span>
+                        {selectedCategoriesData.length > 0 && (
+                          <button
+                            type="button"
+                            className="btn-clear-all-categories"
+                            onClick={clearAllCategories}
+                            style={{
+                              border: '1px solid #fee2e2',
+                              background: '#fef2f2',
+                              color: '#dc2626',
+                              borderRadius: '7px',
+                              padding: '4px 10px',
+                              fontSize: '11.5px',
+                              fontWeight: '800',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                            title={isRtl ? 'إلغاء تحديد جميع الأقسام' : 'Clear all selected categories'}
+                          >
+                            <FaXmark size={11} />
+                            <span>{isRtl ? 'مسح الكل' : 'Clear All'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {selectedCategoriesData.length === 0 ? (
@@ -2104,12 +2142,14 @@ export default function AddProductPage() {
                     ) : (
                       <div className="scp-cards-list">
                         {selectedCategoriesData.map((item) => {
-                          const rootTitle = isRtl
-                            ? (item.parent?.name_ar || item.parent?.name_en || 'القسم الرئيسي')
-                            : (item.parent?.name_en || item.parent?.name_ar || 'Root Category');
-                          const subTitle = isRtl
-                            ? (item.name_ar || item.name_en)
-                            : (item.name_en || item.name_ar);
+                          const hasParent = Boolean(item.parent);
+                          const rootName = hasParent
+                            ? (isRtl ? (item.parent.name_ar || item.parent.name_en) : (item.parent.name_en || item.parent.name_ar))
+                            : (isRtl ? (item.name_ar || item.name_en) : (item.name_en || item.name_ar));
+                          const subName = hasParent
+                            ? (isRtl ? (item.name_ar || item.name_en) : (item.name_en || item.name_ar))
+                            : null;
+                          const prodTitle = nameAr || nameEn || (isRtl ? 'المنتج' : 'Product');
 
                           return (
                             <div
@@ -2117,26 +2157,46 @@ export default function AddProductPage() {
                               className={`selected-cat-card ${item.isPrimary ? 'is-primary' : ''}`}
                             >
                               <div className="scc-chain-row">
-                                <span className="chain-step root-step">
-                                  <FaFolder className="step-icon" />
-                                  <span>{rootTitle}</span>
-                                </span>
-                                <span className="chain-arrow">
-                                  {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
-                                </span>
-                                <span className="chain-step sub-step">
-                                  <OptionIconRenderer
-                                    iconUrl={item.icon_url}
-                                    imageUrl={item.image_url}
-                                    isSubcategory={true}
-                                  />
-                                  <span>{subTitle}</span>
-                                </span>
+                                {hasParent ? (
+                                  <>
+                                    <span className="chain-step root-step">
+                                      <FaFolder className="step-icon" />
+                                      <span>{rootName}</span>
+                                    </span>
+                                    <span className="chain-arrow">
+                                      {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
+                                    </span>
+                                    <span className="chain-step sub-step">
+                                      <span className="cat-chip-icon">
+                                        <OptionIconRenderer
+                                          iconUrl={item.icon_url}
+                                          imageUrl={item.image_url}
+                                          isSubcategory={true}
+                                        />
+                                      </span>
+                                      <span>{subName}</span>
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="chain-step root-step is-direct-root">
+                                    <span className="cat-chip-icon">
+                                      <OptionIconRenderer
+                                        iconUrl={item.icon_url}
+                                        imageUrl={item.image_url}
+                                        isSubcategory={false}
+                                      />
+                                    </span>
+                                    <span>{rootName}</span>
+                                    <span className="root-flag-badge">{isRtl ? 'قسم رئيسي' : 'Root'}</span>
+                                  </span>
+                                )}
+
                                 <span className="chain-arrow">
                                   {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
                                 </span>
                                 <span className="chain-step prod-step">
-                                  <span>{nameAr || nameEn || (isRtl ? '[اسم المنتج]' : '[Product]')}</span>
+                                  <FaBoxOpen className="step-icon" />
+                                  <span>{prodTitle}</span>
                                 </span>
                               </div>
 
@@ -2144,6 +2204,11 @@ export default function AddProductPage() {
                                 <div className="scc-info">
                                   <span className="scc-id">ID: {item.id}</span>
                                   {item.slug && <span className="scc-slug">#{item.slug}</span>}
+                                  <span className={`scc-type-badge ${hasParent ? 'type-sub' : 'type-root'}`}>
+                                    {hasParent
+                                      ? (isRtl ? 'قسم فرعي' : 'Subcategory')
+                                      : (isRtl ? 'قسم رئيسي' : 'Root Category')}
+                                  </span>
                                 </div>
 
                                 <div className="scc-actions">
@@ -2167,8 +2232,9 @@ export default function AddProductPage() {
                                   <button
                                     type="button"
                                     className="btn-remove-selected-cat"
-                                    onClick={() => toggleCategorySelection(item.id)}
+                                    onClick={(e) => removeCategory(item.id, e)}
                                     title={isRtl ? 'إزالة هذا القسم من المنتج' : 'Remove category'}
+                                    aria-label={isRtl ? 'إزالة هذا القسم من المنتج' : 'Remove category'}
                                   >
                                     <FaXmark size={12} />
                                   </button>

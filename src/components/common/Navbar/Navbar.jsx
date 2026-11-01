@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { getApiHost } from '@/src/utils/apiConfig';
-import { getInitialLang, setAppLang } from '@/src/hooks/useTrendlineLang';
+import { getInitialLang, setAppLang, formatLangHref } from '@/src/hooks/useTrendlineLang';
 import './Navbar.scss';
 
 export default function Navbar({ lang = 'ar', onToggleLang }) {
@@ -83,6 +83,27 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
     }
   };
 
+  // Prevent background scroll when mobile drawer is open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  // Close mobile drawer on route navigation
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
   // Handle scroll effect for glassmorphism elevation
   useEffect(() => {
     const handleScroll = () => {
@@ -141,7 +162,8 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      const searchTarget = `/products?search=${encodeURIComponent(searchQuery.trim())}`;
+      router.push(formatLangHref(searchTarget, currentLang));
     }
   };
 
@@ -157,7 +179,7 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
       <div className="navbar-upper-bar">
         {/* Brand Logo Area */}
         <div className="nav-brand-area">
-          <Link href="/" className="brand-logo-link" aria-label="Trendline Tech Home">
+          <Link href={formatLangHref('/', currentLang)} className="brand-logo-link" aria-label="Trendline Tech Home">
             <Image
               src="/assets/logo.png"
               alt="Trendline Tech"
@@ -221,7 +243,7 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
               <span>{isRtl ? 'لوحة التحكم' : 'Dashboard'}</span>
             </Link>
           ) : (
-            <Link href="/contact" className="user-link-item contact-us-btn">
+            <Link href={formatLangHref('/contact', currentLang)} className="user-link-item contact-us-btn">
               <span className="link-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
@@ -232,7 +254,7 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
           )}
 
           {/* Shopping Cart Icon with Badge */}
-          <Link href="/cart" className="cart-btn-wrapper" aria-label="Shopping Cart">
+          <Link href={formatLangHref('/cart', currentLang)} className="cart-btn-wrapper" aria-label="Shopping Cart">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="9" cy="21" r="1"></circle>
               <circle cx="20" cy="21" r="1"></circle>
@@ -243,7 +265,7 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
 
           {/* Mobile Menu Toggle Button */}
           <button
-            className="mobile-menu-toggle"
+            className={`mobile-menu-toggle ${mobileMenuOpen ? 'is-active' : ''}`}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle navigation menu"
           >
@@ -265,47 +287,115 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
         </div>
       </div>
 
-      {/* ---------------- Lower Bar ---------------- */}
+      {/* Mobile Drawer Glassmorphic Backdrop */}
+      <div
+        className={`mobile-menu-backdrop ${mobileMenuOpen ? 'active' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* ---------------- Lower Bar / Mobile Drawer ---------------- */}
       <nav className={`navbar-lower-bar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="lower-nav-content">
+          {/* Mobile Search inside Drawer */}
+          <div className="mobile-drawer-search">
+            <form
+              className="drawer-search-form"
+              onSubmit={(e) => {
+                handleSearchSubmit(e);
+                setMobileMenuOpen(false);
+              }}
+            >
+              <input
+                type="text"
+                className="drawer-search-input"
+                placeholder={isRtl ? 'ابحث عن منتجات، ماركات، فئات...' : 'Search for products, brands...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button type="submit" className="drawer-search-btn" aria-label="Search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </button>
+            </form>
+          </div>
+
           <ul className="nav-links-list">
             {/* الرئيسية (Active on root) */}
             <li className={`nav-link-item ${pathname === '/' ? 'active' : ''}`}>
-              <Link href="/" className="nav-anchor">
-                {isRtl ? 'الرئيسية' : 'Home'}
+              <Link
+                href={formatLangHref('/', currentLang)}
+                className="nav-anchor"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'الرئيسية' : 'Home'}</span>
+                </div>
               </Link>
             </li>
 
             {/* المنتجات */}
             <li className={`nav-link-item ${pathname?.startsWith('/products') ? 'active' : ''}`}>
-              <Link href="/products" className="nav-anchor">
-                {isRtl ? 'المنتجات' : 'Products'}
+              <Link
+                href={formatLangHref('/products', currentLang)}
+                className="nav-anchor"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect width="7" height="7" x="3" y="3" rx="1"></rect>
+                      <rect width="7" height="7" x="14" y="3" rx="1"></rect>
+                      <rect width="7" height="7" x="14" y="14" rx="1"></rect>
+                      <rect width="7" height="7" x="3" y="14" rx="1"></rect>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'المنتجات' : 'Products'}</span>
+                </div>
               </Link>
             </li>
 
             {/* الأقسام (With Dropdown) */}
             <li
-              className={`nav-link-item ${pathname?.startsWith('/categories') ? 'active' : ''}`}
+              className={`nav-link-item ${pathname?.startsWith('/categories') ? 'active' : ''} ${categoriesDropdownOpen ? 'categories-expanded' : ''}`}
               ref={dropdownRef}
               onMouseEnter={() => setCategoriesDropdownOpen(true)}
               onMouseLeave={() => setCategoriesDropdownOpen(false)}
             >
               <Link
-                href="/categories"
+                href={formatLangHref('/categories', currentLang)}
                 className="nav-anchor"
                 onClick={(e) => {
-                  // Allow navigation, or toggle on touch devices
-                  if (window.innerWidth <= 860) {
+                  if (typeof window !== 'undefined' && window.innerWidth <= 860) {
                     e.preventDefault();
                     setCategoriesDropdownOpen(!categoriesDropdownOpen);
+                  } else {
+                    setMobileMenuOpen(false);
                   }
                 }}
               >
-                <span>{isRtl ? 'الأقسام' : 'Categories'}</span>
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                      <polyline points="2 17 12 22 22 17"></polyline>
+                      <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'الأقسام' : 'Categories'}</span>
+                </div>
                 <svg
                   className="dropdown-chevron"
-                  width="14"
-                  height="14"
+                  width="15"
+                  height="15"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -323,13 +413,21 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
                   categories.map((cat) => (
                     <Link
                       key={cat.id}
-                      href={`/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`}
+                      href={formatLangHref(`/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`, currentLang)}
                       className="dropdown-category-link"
-                      onClick={() => setCategoriesDropdownOpen(false)}
+                      onClick={() => {
+                        setCategoriesDropdownOpen(false);
+                        setMobileMenuOpen(false);
+                      }}
                     >
-                      <span>{isRtl ? (cat.name_ar || cat.name) : (cat.name_en || cat.name)}</span>
+                      <div className="cat-left-meta">
+                        <span className="cat-bullet"></span>
+                        <span className="cat-name">{isRtl ? (cat.name_ar || cat.name) : (cat.name_en || cat.name)}</span>
+                      </div>
                       {cat.subcategories?.length > 0 && (
-                        <span className="cat-tag">+{cat.subcategories.length}</span>
+                        <span className="cat-tag">
+                          {cat.subcategories.length} {isRtl ? 'أقسام' : 'subs'}
+                        </span>
                       )}
                     </Link>
                   ))
@@ -340,9 +438,12 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
                 )}
                 <div className="dropdown-divider"></div>
                 <Link
-                  href="/categories"
+                  href={formatLangHref('/categories', currentLang)}
                   className="dropdown-category-link view-all-cats"
-                  onClick={() => setCategoriesDropdownOpen(false)}
+                  onClick={() => {
+                    setCategoriesDropdownOpen(false);
+                    setMobileMenuOpen(false);
+                  }}
                 >
                   {isRtl ? 'عرض جميع الأقسام ←' : 'View All Categories →'}
                 </Link>
@@ -351,32 +452,120 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
 
             {/* عروض خاصة */}
             <li className={`nav-link-item ${pathname === '/deals' ? 'active' : ''}`}>
-              <Link href="/deals" className="nav-anchor">
-                {isRtl ? 'عروض خاصة' : 'Special Deals'}
+              <Link
+                href={formatLangHref('/deals', currentLang)}
+                className="nav-anchor"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'عروض خاصة' : 'Special Deals'}</span>
+                </div>
+                <span className="nav-item-badge hot-badge">
+                  {isRtl ? 'عروض 🔥' : 'Hot 🔥'}
+                </span>
               </Link>
             </li>
 
             {/* تتبع الطلب */}
             <li className={`nav-link-item ${pathname === '/track-order' ? 'active' : ''}`}>
-              <Link href="/track-order" className="nav-anchor">
-                {isRtl ? 'تتبع الطلب' : 'Track Order'}
+              <Link
+                href={formatLangHref('/track-order', currentLang)}
+                className="nav-anchor"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path>
+                      <path d="M15 18H9"></path>
+                      <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path>
+                      <circle cx="17" cy="18" r="2"></circle>
+                      <circle cx="7" cy="18" r="2"></circle>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'تتبع الطلب' : 'Track Order'}</span>
+                </div>
               </Link>
             </li>
 
             {/* من نحن */}
             <li className={`nav-link-item ${pathname === '/about' ? 'active' : ''}`}>
-              <Link href="/about" className="nav-anchor">
-                {isRtl ? 'من نحن' : 'About Us'}
+              <Link
+                href={formatLangHref('/about', currentLang)}
+                className="nav-anchor"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <path d="M12 16v-4"></path>
+                      <path d="M12 8h.01"></path>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'من نحن' : 'About Us'}</span>
+                </div>
               </Link>
             </li>
 
             {/* تواصل معنا */}
             <li className={`nav-link-item ${pathname === '/contact' ? 'active' : ''}`}>
-              <Link href="/contact" className="nav-anchor">
-                {isRtl ? 'تواصل معنا' : 'Contact Us'}
+              <Link
+                href={formatLangHref('/contact', currentLang)}
+                className="nav-anchor"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'تواصل معنا' : 'Contact Us'}</span>
+                </div>
               </Link>
             </li>
           </ul>
+
+          {/* Quick Action Footer inside Drawer */}
+          <div className="mobile-drawer-footer">
+            <button
+              type="button"
+              className="drawer-footer-btn lang-toggle"
+              onClick={() => {
+                handleToggleLanguage();
+                setMobileMenuOpen(false);
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+              <span>{currentLang === 'ar' ? 'English (EN)' : 'العربية (AR)'}</span>
+            </button>
+
+            {isAdminLoggedIn && (
+              <Link
+                href="/admin/products"
+                className="drawer-footer-btn admin-dashboard"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="7" height="7" x="3" y="3" rx="1"></rect>
+                  <rect width="7" height="7" x="14" y="3" rx="1"></rect>
+                  <rect width="7" height="7" x="14" y="14" rx="1"></rect>
+                  <rect width="7" height="7" x="3" y="14" rx="1"></rect>
+                </svg>
+                <span>{isRtl ? 'لوحة التحكم' : 'Dashboard'}</span>
+              </Link>
+            )}
+          </div>
         </div>
       </nav>
     </header>

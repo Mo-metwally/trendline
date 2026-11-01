@@ -169,6 +169,7 @@ export default function AmazonMediaGallery({
   const [lensPos, setLensPos] = useState({ x: 0, y: 0 });
   const [lensSize, setLensSize] = useState({ width: 140, height: 140 });
   const [bgPos, setBgPos] = useState({ x: 0, y: 0 });
+  const [bgSize, setBgSize] = useState('280% 280%');
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [isDirectPlaying, setIsDirectPlaying] = useState(true);
@@ -232,6 +233,7 @@ export default function AmazonMediaGallery({
     const pctY = maxLensY > 0 ? (lensY / maxLensY) * 100 : 50;
 
     setBgPos({ x: pctX, y: pctY });
+    setBgSize(`${(rect.width / lensW) * 100}% ${(rect.height / lensH) * 100}%`);
     setIsZooming(true);
   };
 
@@ -519,7 +521,7 @@ export default function AmazonMediaGallery({
             style={{
               backgroundImage: `url(${activeMedia.url})`,
               backgroundPosition: `${bgPos.x}% ${bgPos.y}%`,
-              backgroundSize: '280%',
+              backgroundSize: bgSize,
               backgroundRepeat: 'no-repeat',
             }}
           >

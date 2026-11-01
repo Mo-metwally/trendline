@@ -51,7 +51,7 @@ function renderCategoryThumb(cat) {
 }
 
 function AllCategoriesContent() {
-  const { lang, isRtl, setLang } = useTrendlineLang('ar');
+  const { lang, isRtl, setLang, formatLangHref } = useTrendlineLang('ar');
   const currencyLabel = isRtl ? 'ج.م' : 'EGP';
 
   const searchParams = useSearchParams();
@@ -70,7 +70,35 @@ function AllCategoriesContent() {
   const [onlyWithSubcats, setOnlyWithSubcats] = useState(false);
   const [onlyWithOffers, setOnlyWithOffers] = useState(false);
   const [catSortBy, setCatSortBy] = useState('default'); // 'default' | 'products_desc' | 'subcats_desc' | 'price_asc' | 'name_asc'
-  const [hubViewMode, setHubViewMode] = useState('sections'); // 'sections' | 'bento_grid' | 'directory_matrix'
+  const [hubViewMode, setHubViewMode] = useState('bento_grid'); // 'bento_grid' (Category Cards default) | 'sections' | 'directory_matrix'
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  // Prevent background scroll when mobile filter drawer is open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (isMobileFilterOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [isMobileFilterOpen]);
+
+  // Active filters count
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedCategory && selectedCategory !== 'all') count++;
+    if (selectedBrand && selectedBrand !== 'all') count++;
+    if (onlyWithOffers) count++;
+    if (onlyWithSubcats) count++;
+    if (searchQuery && searchQuery.trim()) count++;
+    return count;
+  }, [selectedCategory, selectedBrand, onlyWithOffers, onlyWithSubcats, searchQuery]);
 
   useEffect(() => {
     let isMounted = true;
@@ -522,23 +550,41 @@ function AllCategoriesContent() {
             </p>
           </div>
         ) : (
-          <div className="single-cat-workspace">
-            {/* ================= SIDEBAR: CATEGORY TREE & FILTERS ================= */}
-            <aside className="cat-filters-sidebar">
-              <div className="sidebar-head">
-                <h4>
-                  <FaFilter color="#1d4ed8" />
-                  <span>{isRtl ? 'فلترة الأقسام' : 'Filter Categories'}</span>
-                </h4>
-                <button
-                  type="button"
-                  className="reset-btn"
-                  onClick={handleResetFilters}
-                >
-                  <FaRotateLeft style={{ marginLeft: isRtl ? '4px' : 0, marginRight: isRtl ? 0 : '4px' }} />
-                  {isRtl ? 'إعادة ضبط' : 'Reset'}
-                </button>
-              </div>
+          <>
+            {/* Mobile Filter Backdrop */}
+            <div
+              className={`mobile-filter-backdrop ${isMobileFilterOpen ? 'active' : ''}`}
+              onClick={() => setIsMobileFilterOpen(false)}
+              aria-hidden="true"
+            />
+
+            <div className="single-cat-workspace">
+              {/* ================= SIDEBAR: CATEGORY TREE & FILTERS ================= */}
+              <aside className={`cat-filters-sidebar ${isMobileFilterOpen ? 'mobile-filter-open' : ''}`}>
+                <div className="sidebar-head">
+                  <h4>
+                    <FaFilter color="#1d4ed8" />
+                    <span>{isRtl ? 'فلترة الأقسام' : 'Filter Categories'}</span>
+                  </h4>
+                  <div className="sidebar-head-actions">
+                    <button
+                      type="button"
+                      className="reset-btn"
+                      onClick={handleResetFilters}
+                    >
+                      <FaRotateLeft style={{ marginLeft: isRtl ? '4px' : 0, marginRight: isRtl ? 0 : '4px' }} />
+                      {isRtl ? 'إعادة ضبط' : 'Reset'}
+                    </button>
+                    <button
+                      type="button"
+                      className="mobile-close-filter-btn"
+                      onClick={() => setIsMobileFilterOpen(false)}
+                      aria-label={isRtl ? 'إغلاق الفلتر' : 'Close filters'}
+                    >
+                      <FaXmark />
+                    </button>
+                  </div>
+                </div>
 
               {/* 1. Search Categories or Subcategories */}
               <div className="filter-group">
@@ -710,6 +756,19 @@ function AllCategoriesContent() {
                   </div>
                 </div>
               )}
+
+              {/* Mobile Filter Apply Bar */}
+              <div className="mobile-filter-apply-bar">
+                <button
+                  type="button"
+                  className="apply-filter-action-btn"
+                  onClick={() => setIsMobileFilterOpen(false)}
+                >
+                  {isRtl
+                    ? `عرض النتائج (${displayedCategorySections.length} أقسام)`
+                    : `Show Results (${displayedCategorySections.length} Categories)`}
+                </button>
+              </div>
             </aside>
 
             {/* ================= MAIN AREA: CATEGORIES SHOWCASE WITH 3 VIEW MODES ================= */}
@@ -717,6 +776,20 @@ function AllCategoriesContent() {
               {/* Top Toolbar: Category Count + Active Filters + Category Sort + 3 View Modes */}
               <div className="cat-toolbar">
                 <div className="results-summary">
+                  {/* Mobile Filter Toggle Button */}
+                  <button
+                    type="button"
+                    className="mobile-filter-toggle-btn"
+                    onClick={() => setIsMobileFilterOpen(true)}
+                    aria-label={isRtl ? 'فتح فلاتر البحث' : 'Open search filters'}
+                  >
+                    <FaFilter size={12} />
+                    <span>{isRtl ? 'تصفية وفلترة' : 'Filters'}</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="filter-badge">{activeFiltersCount}</span>
+                    )}
+                  </button>
+
                   <span>
                     {isRtl ? (
                       <>
@@ -871,7 +944,7 @@ function AllCategoriesContent() {
                       previewProducts,
                       minCatPrice,
                     }) => {
-                      const catUrl = `/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`;
+                      const catUrl = formatLangHref(`/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`);
                       const catName = isRtl
                         ? (cat.name_ar || cat.name_en)
                         : (cat.name_en || cat.name_ar);
@@ -1039,7 +1112,7 @@ function AllCategoriesContent() {
                       previewProducts,
                       minCatPrice,
                     }) => {
-                      const catUrl = `/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`;
+                      const catUrl = formatLangHref(`/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`);
                       const catName = isRtl
                         ? (cat.name_ar || cat.name_en)
                         : (cat.name_en || cat.name_ar);
@@ -1094,7 +1167,7 @@ function AllCategoriesContent() {
                                   return (
                                     <Link
                                       key={sub.id}
-                                      href={`/categories/${encodeURIComponent(sub.id)}/${encodeURIComponent(sub.slug || sub.id)}`}
+                                      href={formatLangHref(`/categories/${encodeURIComponent(sub.id)}/${encodeURIComponent(sub.slug || sub.id)}`)}
                                       className="bento-sub-chip"
                                     >
                                       <span>{subName}</span>
@@ -1171,7 +1244,7 @@ function AllCategoriesContent() {
                       previewProducts,
                       minCatPrice,
                     }) => {
-                      const catUrl = `/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`;
+                      const catUrl = formatLangHref(`/categories/${encodeURIComponent(cat.id)}/${encodeURIComponent(cat.slug || cat.id)}`);
                       const catName = isRtl
                         ? (cat.name_ar || cat.name_en)
                         : (cat.name_en || cat.name_ar);
@@ -1226,7 +1299,7 @@ function AllCategoriesContent() {
                                   return (
                                     <Link
                                       key={sub.id}
-                                      href={`/categories/${encodeURIComponent(sub.id)}/${encodeURIComponent(sub.slug || sub.id)}`}
+                                      href={formatLangHref(`/categories/${encodeURIComponent(sub.id)}/${encodeURIComponent(sub.slug || sub.id)}`)}
                                       className="mc-sub-pill"
                                     >
                                       <span>{subName}</span>
@@ -1284,8 +1357,9 @@ function AllCategoriesContent() {
               )}
             </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
+    </div>
 
       <Footer lang={lang} />
     </div>

@@ -15,6 +15,7 @@ import {
 } from '@/src/components/adminComponents';
 import {
   FaFolderTree,
+  FaFolder,
   FaTag,
   FaTags,
   FaStar,
@@ -32,6 +33,7 @@ import {
   FaFilm,
   FaTrashCan,
   FaArrowsRotate,
+  FaBoxOpen,
   FaCircleCheck,
   FaClock,
   FaCompress,
@@ -550,9 +552,9 @@ function EditProductContent() {
           prod.showcase_tabs.custom_enabled !== undefined
             ? !!prod.showcase_tabs.custom_enabled
             : !!(prod.showcase_tabs.tabs?.specs?.enabled ||
-                prod.showcase_tabs.tabs?.features?.enabled ||
-                prod.showcase_tabs.tabs?.warranty?.enabled ||
-                (Array.isArray(prod.showcase_tabs.pillars) && prod.showcase_tabs.pillars.length > 0));
+              prod.showcase_tabs.tabs?.features?.enabled ||
+              prod.showcase_tabs.tabs?.warranty?.enabled ||
+              (Array.isArray(prod.showcase_tabs.pillars) && prod.showcase_tabs.pillars.length > 0));
 
         setShowcaseTabs({
           ...DEFAULT_SHOWCASE_TABS,
@@ -741,7 +743,7 @@ function EditProductContent() {
           return;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // Fallback standard EAN-13 with valid GS1 checksum
     const prefix = '622';
@@ -769,7 +771,7 @@ function EditProductContent() {
           return;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const prefix = 'TRD';
     const catCode = catId
@@ -810,8 +812,29 @@ function EditProductContent() {
     [rawProductId]
   );
 
+  // Dedicated Category Removal handler (Unconditionally removes ANY category, including legacy root categories)
+  const removeCategory = (categoryId, e) => {
+    if (e) e.stopPropagation();
+    setCategoryValidationError(false);
+    setSelectedCategoryIds((prev) => {
+      const updated = prev.filter((id) => String(id) !== String(categoryId));
+      if (String(primaryCategoryId) === String(categoryId)) {
+        setPrimaryCategoryId(updated.length > 0 ? updated[0] : '');
+      }
+      return updated;
+    });
+  };
+
   // Category Multi-selection handlers
   const toggleCategorySelection = (categoryId) => {
+    // If it's already selected, ALWAYS allow removing it (even if it was a legacy root category)
+    const isCurrentlySelected = selectedCategoryIds.some((id) => String(id) === String(categoryId));
+    if (isCurrentlySelected) {
+      removeCategory(categoryId);
+      return;
+    }
+
+    // Only enforce hierarchy rule when ADDING: Products can ONLY be assigned to subcategories
     const isRoot = categoriesTree.some((root) => String(root.id) === String(categoryId));
     if (isRoot) {
       toast.warning(
@@ -825,17 +848,9 @@ function EditProductContent() {
 
     setCategoryValidationError(false);
     setSelectedCategoryIds((prev) => {
-      let updated;
-      if (prev.includes(categoryId)) {
-        updated = prev.filter((id) => id !== categoryId);
-        if (primaryCategoryId === categoryId) {
-          setPrimaryCategoryId(updated.length > 0 ? updated[0] : '');
-        }
-      } else {
-        updated = [...prev, categoryId];
-        if (!primaryCategoryId) {
-          setPrimaryCategoryId(categoryId);
-        }
+      const updated = [...prev, categoryId];
+      if (!primaryCategoryId) {
+        setPrimaryCategoryId(categoryId);
       }
       return updated;
     });
@@ -1205,10 +1220,10 @@ function EditProductContent() {
       setCoverMedia((prev) =>
         prev
           ? {
-              ...prev,
-              uploadedUrl: uploadedUrl || prev.previewUrl,
-              uploading: false,
-            }
+            ...prev,
+            uploadedUrl: uploadedUrl || prev.previewUrl,
+            uploading: false,
+          }
           : null
       );
     } catch (err) {
@@ -1384,13 +1399,13 @@ function EditProductContent() {
           prev.map((item) =>
             item.id === tempId
               ? {
-                  ...item,
-                  uploadedUrl: uploadedUrl || item.previewUrl,
-                  size: finalSize || item.size,
-                  savingsPercent: savingsPercent || 0,
-                  resolutionBadge: uploadRes?.resolutionBadge || '720p HD Optimized',
-                  uploading: false,
-                }
+                ...item,
+                uploadedUrl: uploadedUrl || item.previewUrl,
+                size: finalSize || item.size,
+                savingsPercent: savingsPercent || 0,
+                resolutionBadge: uploadRes?.resolutionBadge || '720p HD Optimized',
+                uploading: false,
+              }
               : item
           )
         );
@@ -2483,9 +2498,35 @@ function EditProductContent() {
                             </p>
                           </div>
                         </div>
-                        <span className="scp-count-badge">
-                          {selectedCategoriesData.length} {isRtl ? 'أقسام محددة' : 'Selected'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="scp-count-badge">
+                            {selectedCategoriesData.length} {isRtl ? 'أقسام محددة' : 'Selected'}
+                          </span>
+                          {selectedCategoriesData.length > 0 && (
+                            <button
+                              type="button"
+                              className="btn-clear-all-categories"
+                              onClick={clearAllCategories}
+                              style={{
+                                border: '1px solid #fee2e2',
+                                background: '#fef2f2',
+                                color: '#dc2626',
+                                borderRadius: '7px',
+                                padding: '4px 10px',
+                                fontSize: '11.5px',
+                                fontWeight: '800',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              title={isRtl ? 'إلغاء تحديد جميع الأقسام' : 'Clear all selected categories'}
+                            >
+                              <FaXmark size={11} />
+                              <span>{isRtl ? 'مسح الكل' : 'Clear All'}</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {selectedCategoriesData.length === 0 ? (
@@ -2503,12 +2544,14 @@ function EditProductContent() {
                       ) : (
                         <div className="scp-cards-list">
                           {selectedCategoriesData.map((item) => {
-                            const rootTitle = isRtl
-                              ? (item.parent?.name_ar || item.parent?.name_en || 'القسم الرئيسي')
-                              : (item.parent?.name_en || item.parent?.name_ar || 'Root Category');
-                            const subTitle = isRtl
-                              ? (item.name_ar || item.name_en)
-                              : (item.name_en || item.name_ar);
+                            const hasParent = Boolean(item.parent);
+                            const rootName = hasParent
+                              ? (isRtl ? (item.parent.name_ar || item.parent.name_en) : (item.parent.name_en || item.parent.name_ar))
+                              : (isRtl ? (item.name_ar || item.name_en) : (item.name_en || item.name_ar));
+                            const subName = hasParent
+                              ? (isRtl ? (item.name_ar || item.name_en) : (item.name_en || item.name_ar))
+                              : null;
+                            const prodTitle = nameAr || nameEn || (isRtl ? 'المنتج' : 'Product');
 
                             return (
                               <div
@@ -2516,26 +2559,46 @@ function EditProductContent() {
                                 className={`selected-cat-card ${item.isPrimary ? 'is-primary' : ''}`}
                               >
                                 <div className="scc-chain-row">
-                                  <span className="chain-step root-step">
-                                    <FaFolder className="step-icon" />
-                                    <span>{rootTitle}</span>
-                                  </span>
-                                  <span className="chain-arrow">
-                                    {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
-                                  </span>
-                                  <span className="chain-step sub-step">
-                                    <OptionIconRenderer
-                                      iconUrl={item.icon_url}
-                                      imageUrl={item.image_url}
-                                      isSubcategory={true}
-                                    />
-                                    <span>{subTitle}</span>
-                                  </span>
+                                  {hasParent ? (
+                                    <>
+                                      <span className="chain-step root-step">
+                                        <FaFolder className="step-icon" />
+                                        <span>{rootName}</span>
+                                      </span>
+                                      <span className="chain-arrow">
+                                        {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
+                                      </span>
+                                      <span className="chain-step sub-step">
+                                        <span className="cat-chip-icon">
+                                          <OptionIconRenderer
+                                            iconUrl={item.icon_url}
+                                            imageUrl={item.image_url}
+                                            isSubcategory={true}
+                                          />
+                                        </span>
+                                        <span>{subName}</span>
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="chain-step root-step is-direct-root">
+                                      <span className="cat-chip-icon">
+                                        <OptionIconRenderer
+                                          iconUrl={item.icon_url}
+                                          imageUrl={item.image_url}
+                                          isSubcategory={false}
+                                        />
+                                      </span>
+                                      <span>{rootName}</span>
+                                      <span className="root-flag-badge">{isRtl ? 'قسم رئيسي' : 'Root'}</span>
+                                    </span>
+                                  )}
+
                                   <span className="chain-arrow">
                                     {isRtl ? <FaChevronLeft /> : <FaChevronRight />}
                                   </span>
                                   <span className="chain-step prod-step">
-                                    <span>{nameAr || nameEn || (isRtl ? '[اسم المنتج]' : '[Product]')}</span>
+                                    <FaBoxOpen className="step-icon" />
+                                    <span>{prodTitle}</span>
                                   </span>
                                 </div>
 
@@ -2543,6 +2606,11 @@ function EditProductContent() {
                                   <div className="scc-info">
                                     <span className="scc-id">ID: {item.id}</span>
                                     {item.slug && <span className="scc-slug">#{item.slug}</span>}
+                                    <span className={`scc-type-badge ${hasParent ? 'type-sub' : 'type-root'}`}>
+                                      {hasParent
+                                        ? (isRtl ? 'قسم فرعي' : 'Subcategory')
+                                        : (isRtl ? 'قسم رئيسي' : 'Root Category')}
+                                    </span>
                                   </div>
 
                                   <div className="scc-actions">
@@ -2566,8 +2634,9 @@ function EditProductContent() {
                                     <button
                                       type="button"
                                       className="btn-remove-selected-cat"
-                                      onClick={() => toggleCategorySelection(item.id)}
+                                      onClick={(e) => removeCategory(item.id, e)}
                                       title={isRtl ? 'إزالة هذا القسم من المنتج' : 'Remove category'}
+                                      aria-label={isRtl ? 'إزالة هذا القسم من المنتج' : 'Remove category'}
                                     >
                                       <FaXmark size={12} />
                                     </button>
@@ -2682,7 +2751,7 @@ function EditProductContent() {
                                         <input
                                           type="checkbox"
                                           checked={isSubSelected}
-                                          onChange={() => {}}
+                                          onChange={() => { }}
                                         />
                                       </div>
                                       <div className="sub-icon-box">
@@ -3275,14 +3344,14 @@ function EditProductContent() {
                     </div>
                   </div>
 
-                <div className="admin-live-preview-stage">
-                  <StoreProductCard
-                    product={livePreviewProduct}
-                    lang={isRtl ? 'ar' : 'en'}
-                    isPreview={true}
-                  />
+                  <div className="admin-live-preview-stage">
+                    <StoreProductCard
+                      product={livePreviewProduct}
+                      lang={isRtl ? 'ar' : 'en'}
+                      isPreview={true}
+                    />
+                  </div>
                 </div>
-              </div>
 
                 {/* Card 8: Brand Selection & Quick Add */}
                 <div className="form-section-card">
