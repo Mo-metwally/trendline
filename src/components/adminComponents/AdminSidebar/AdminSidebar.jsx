@@ -14,6 +14,7 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
     products: pathname === '/admin/products' || pathname?.startsWith('/admin/products/'),
     categories: pathname === '/admin/categories' || pathname?.startsWith('/admin/categories/'),
     tags: pathname === '/admin/tags' || pathname?.startsWith('/admin/tags/') || pathname === '/admin/brands' || pathname?.startsWith('/admin/brands/'),
+    services: pathname === '/admin/services' || pathname?.startsWith('/admin/services/'),
   }));
 
   useEffect(() => {
@@ -25,6 +26,9 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
     }
     if (pathname === '/admin/tags' || pathname?.startsWith('/admin/tags/') || pathname === '/admin/brands' || pathname?.startsWith('/admin/brands/')) {
       setOpenMenus((prev) => ({ ...prev, tags: true }));
+    }
+    if (pathname === '/admin/services' || pathname?.startsWith('/admin/services/')) {
+      setOpenMenus((prev) => ({ ...prev, services: true }));
     }
   }, [pathname]);
 
@@ -138,6 +142,27 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, lang = 'ar
               icon: <FaPlus size={12} />
             }
           ]
+        },
+        {
+          key: 'services',
+          label: isRtl ? 'الخدمات' : 'Services',
+          icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+            </svg>
+          ),
+          subItems: [
+            {
+              href: '/admin/services',
+              label: isRtl ? 'كل الخدمات' : 'All Services',
+              icon: <FaBoxesStacked size={13} />,
+            },
+            {
+              href: '/admin/services/add',
+              label: isRtl ? 'إضافة خدمة' : 'Add Service',
+              icon: <FaPlus size={12} />,
+            },
+          ],
         },
         {
           href: '/admin/bundles',

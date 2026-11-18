@@ -6,12 +6,16 @@ const catalogRoutes = require('./catalogRoutes');
 const orderRoutes = require('./orderRoutes');
 const erpRoutes = require('./erpRoutes');
 const cmsRoutes = require('./cmsRoutes');
+const serviceRoutes = require('./serviceRoutes');
+const cartRoutes = require('./cartRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/catalog', catalogRoutes);
 router.use('/orders', orderRoutes);
 router.use('/erp', erpRoutes);
 router.use('/cms', cmsRoutes);
+router.use('/services', serviceRoutes);
+router.use('/cart', cartRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

@@ -274,6 +274,40 @@
         transform: scale(1.08);
       }
     }
+
+    /* Quick add to cart floating button */
+    .sp-quick-cart {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      right: auto;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 5;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+
+      &:hover {
+        background: #16a34a;
+        color: #ffffff;
+        border-color: #16a34a;
+        transform: scale(1.08);
+      }
+
+      &.is-adding {
+        background: #16a34a;
+        color: #ffffff;
+      }
+    }
   }
 
   /* Card Content Body */
@@ -395,27 +429,60 @@
         }
       }
 
-      .sp-view-btn {
-        display: inline-flex;
+      .sp-actions-box {
+        display: flex;
         align-items: center;
         gap: 6px;
-        padding: 8px 14px;
-        border-radius: 10px;
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        color: #1d4ed8;
-        font-size: 12px;
-        font-weight: 800;
-        text-decoration: none;
-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        white-space: nowrap;
 
-        &:hover {
-          background: #1d4ed8;
+        .sp-add-cart-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 8px 11px;
+          border-radius: 10px;
+          background: #16a34a;
+          border: 1px solid #16a34a;
           color: #ffffff;
-          border-color: #1d4ed8;
-          box-shadow: 0 4px 12px rgba(29, 78, 216, 0.25);
-          transform: translateY(-1px);
+          font-size: 11.5px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          white-space: nowrap;
+
+          &:hover {
+            background: #15803d;
+            border-color: #15803d;
+            box-shadow: 0 4px 12px rgba(22, 163, 74, 0.28);
+            transform: translateY(-1px);
+          }
+
+          &.is-adding {
+            background: #059669;
+          }
+        }
+
+        .sp-view-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 8px 11px;
+          border-radius: 10px;
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+          color: #1d4ed8;
+          font-size: 11.5px;
+          font-weight: 800;
+          text-decoration: none;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          white-space: nowrap;
+
+          &:hover {
+            background: #1d4ed8;
+            color: #ffffff;
+            border-color: #1d4ed8;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.25);
+            transform: translateY(-1px);
+          }
         }
       }
     }
@@ -440,6 +507,11 @@
       }
 
       .sp-quick-share {
+        left: auto !important;
+        right: 10px !important;
+      }
+
+      .sp-quick-cart {
         left: auto !important;
         right: 10px !important;
       }

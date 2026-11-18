@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useCart } from '@/src/context/CartContext';
 import { getApiHost } from '@/src/utils/apiConfig';
 import { getInitialLang, setAppLang, formatLangHref } from '@/src/hooks/useTrendlineLang';
 import './Navbar.scss';
@@ -21,7 +22,8 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
   const [categoriesDropdownOpen, setCategoriesDropdownOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cartCount] = useState(0);
+  const { cart, openCart } = useCart();
+  const cartCount = cart?.items_count || 0;
 
   const dropdownRef = useRef(null);
 
@@ -176,7 +178,7 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* ---------------- Upper Bar ---------------- */}
-      <div className="navbar-upper-bar">
+      <div className="navbar-upper-bar" suppressHydrationWarning>
         {/* Brand Logo Area */}
         <div className="nav-brand-area">
           <Link href={formatLangHref('/', currentLang)} className="brand-logo-link" aria-label="Trendline Tech Home">
@@ -254,14 +256,20 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
           )}
 
           {/* Shopping Cart Icon with Badge */}
-          <Link href={formatLangHref('/cart', currentLang)} className="cart-btn-wrapper" aria-label="Shopping Cart">
+          <button
+            type="button"
+            onClick={openCart}
+            className="cart-btn-wrapper"
+            aria-label={isRtl ? 'سلة المشتريات' : 'Shopping Cart'}
+            title={isRtl ? 'سلة المشتريات' : 'Shopping Cart'}
+          >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="9" cy="21" r="1"></circle>
               <circle cx="20" cy="21" r="1"></circle>
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
             </svg>
             <span className="cart-badge">{cartCount}</span>
-          </Link>
+          </button>
 
           {/* Mobile Menu Toggle Button */}
           <button
@@ -408,7 +416,10 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
               </Link>
 
               {/* Glassmorphic Dropdown Menu */}
-              <div className={`categories-dropdown-menu ${categoriesDropdownOpen ? 'show' : ''}`}>
+              <div
+                suppressHydrationWarning
+                className={`categories-dropdown-menu ${categoriesDropdownOpen ? 'show' : ''}`}
+              >
                 {categories.length > 0 ? (
                   categories.map((cat) => (
                     <Link
@@ -432,7 +443,7 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
                     </Link>
                   ))
                 ) : (
-                  <div className="p-3 text-sm text-slate-400 text-center">
+                  <div className="p-3 text-sm text-slate-400 text-center" suppressHydrationWarning>
                     {isRtl ? 'جاري تحميل الأقسام...' : 'Loading categories...'}
                   </div>
                 )}
@@ -470,6 +481,53 @@ export default function Navbar({ lang = 'ar', onToggleLang }) {
                 </span>
               </Link>
             </li>
+
+            {/* خدماتنا */}
+            <li className={`nav-link-item ${pathname === '/services' ? 'active' : ''}`}>
+              <Link
+                href={formatLangHref('/services', currentLang)}
+                className="nav-anchor"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'خدماتنا' : 'Services'}</span>
+                </div>
+              </Link>
+            </li>
+
+            {/* سلة المشتريات ف السايد بار الموبايل */}
+            {/* <li className={`nav-link-item ${pathname === '/cart' ? 'active' : ''}`}>
+              <button
+                type="button"
+                className="nav-anchor"
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'inherit', cursor: 'pointer' }}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openCart();
+                }}
+              >
+                <div className="nav-anchor-left">
+                  <span className="nav-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="9" cy="21" r="1"></circle>
+                      <circle cx="20" cy="21" r="1"></circle>
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                  </span>
+                  <span className="nav-item-label">{isRtl ? 'سلة المشتريات' : 'Shopping Cart'}</span>
+                </div>
+                {cartCount > 0 && (
+                  <span className="nav-item-badge hot-badge" style={{ background: '#2563eb', color: '#ffffff' }}>
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            </li> */}
 
             {/* تتبع الطلب */}
             <li className={`nav-link-item ${pathname === '/track-order' ? 'active' : ''}`}>

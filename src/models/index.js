@@ -42,6 +42,9 @@ const ContactMessage = require('./ContactMessage');
 const NewsletterSubscriber = require('./NewsletterSubscriber');
 const StaticPage = require('./StaticPage');
 const SiteSetting = require('./SiteSetting');
+const Service = require('./Service');
+const Cart = require('./Cart');
+const CartItem = require('./CartItem');
 
 // Reset existing associations on hot-reload to prevent SequelizeAssociationError under Turbopack HMR
 [
@@ -69,6 +72,8 @@ const SiteSetting = require('./SiteSetting');
   OrderReturn,
   OrderReturnItem,
   FinancialTransaction,
+  Cart,
+  CartItem,
 ].forEach((model) => {
   if (model && model.associations) {
     model.associations = {};
@@ -186,6 +191,16 @@ FinancialTransaction.belongsTo(OrderReturn, { foreignKey: 'rma_id', as: 'return_
 PurchaseOrder.hasMany(FinancialTransaction, { foreignKey: 'po_id', as: 'financial_transactions', onDelete: 'SET NULL' });
 FinancialTransaction.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });
 
+// 10. Server-side Carts
+Cart.hasMany(CartItem, { foreignKey: 'cart_id', as: 'items', onDelete: 'CASCADE' });
+CartItem.belongsTo(Cart, { foreignKey: 'cart_id', as: 'cart' });
+
+CartItem.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(CartItem, { foreignKey: 'product_id', as: 'cart_items', onDelete: 'CASCADE' });
+
+CartItem.belongsTo(Bundle, { foreignKey: 'bundle_id', as: 'bundle' });
+Bundle.hasMany(CartItem, { foreignKey: 'bundle_id', as: 'cart_items', onDelete: 'CASCADE' });
+
 module.exports = {
   sequelize,
   AdminUser,
@@ -212,6 +227,8 @@ module.exports = {
   OrderReturn,
   OrderReturnItem,
   FinancialTransaction,
+  Cart,
+  CartItem,
   ShippingZone,
   Banner,
   SpecialOfferCard,
@@ -221,4 +238,5 @@ module.exports = {
   NewsletterSubscriber,
   StaticPage,
   SiteSetting,
+  Service,
 };

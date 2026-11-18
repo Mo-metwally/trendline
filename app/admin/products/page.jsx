@@ -8,6 +8,7 @@ import {
   AdminSidebar,
   AdminHeader,
   CustomSelect,
+  ProductZipManager,
 } from '@/src/components/adminComponents';
 import {
   FaBox,
@@ -31,6 +32,8 @@ import {
   FaArrowDownAZ,
   FaCircleCheck,
   FaTriangleExclamation,
+  FaFileZipper,
+  FaDownload,
 } from 'react-icons/fa6';
 import './Products.scss';
 
@@ -72,6 +75,8 @@ export default function AdminProductsPage() {
 
   // Selection & Bulk Actions
   const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [importZipModalOpen, setImportZipModalOpen] = useState(false);
+  const [exportZipModalOpen, setExportZipModalOpen] = useState(false);
 
   // Modals & Drawers
   const [quickEditProduct, setQuickEditProduct] = useState(null);
@@ -557,6 +562,24 @@ export default function AdminProductsPage() {
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
                 </svg>
                 <span>تحديث</span>
+              </button>
+
+              <button
+                className="btn-secondary-action"
+                onClick={() => setImportZipModalOpen(true)}
+                title="استيراد منتجات وصور عبر ملف ZIP"
+              >
+                <FaFileZipper size={15} style={{ color: '#38bdf8' }} />
+                <span>استيراد ZIP</span>
+              </button>
+
+              <button
+                className="btn-secondary-action"
+                onClick={() => setExportZipModalOpen(true)}
+                title="تصدير المنتجات مع الصور في ملف ZIP"
+              >
+                <FaDownload size={14} style={{ color: '#34d399' }} />
+                <span>تصدير ZIP</span>
               </button>
 
               <button className="btn-secondary-action" onClick={handleExportCSV} title="تصدير ملف Excel">
@@ -1543,6 +1566,24 @@ export default function AdminProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk ZIP Import & Export Manager */}
+      <ProductZipManager
+        isOpen={importZipModalOpen}
+        onClose={() => setImportZipModalOpen(false)}
+        exportOpen={exportZipModalOpen}
+        onCloseExport={() => setExportZipModalOpen(false)}
+        onSuccess={() => {
+          fetchProducts();
+          fetchAnalytics();
+        }}
+        categories={categories}
+        selectedProductIds={selectedProductIds}
+        products={products}
+        totalCount={totalCount}
+        lang={lang}
+        showToast={showToast}
+      />
     </div>
   );
 }

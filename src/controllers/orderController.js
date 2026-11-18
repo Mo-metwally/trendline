@@ -5,6 +5,7 @@ const {
   OrderItem,
   OrderTrackingLog,
   Product,
+  ProductImage,
   Bundle,
   BundleItem,
   ShippingZone,
@@ -40,6 +41,7 @@ class OrderController {
         governorate,
         city,
         street_address,
+        landmark,
         order_notes,
         locale = 'ar',
         payment_method = 'cod',
@@ -183,6 +185,7 @@ class OrderController {
         governorate,
         city,
         street_address,
+        landmark: landmark ? landmark.trim() : null,
         order_notes,
         locale: locale === 'en' ? 'en' : 'ar',
         subtotal,
@@ -203,11 +206,26 @@ class OrderController {
         success: true,
         message: locale === 'en' ? 'Order placed successfully!' : 'تم تقديم طلبك بنجاح!',
         data: {
+          id: order.id,
           order_number: order.order_number,
           total_amount: order.total_amount,
+          subtotal: order.subtotal,
+          discount_amount: order.discount_amount,
           shipping_fee: order.shipping_fee,
+          payment_method: order.payment_method,
+          payment_status: order.payment_status,
           order_status: order.order_status,
+          customer_name: order.customer_name,
+          customer_phone: order.customer_phone,
+          customer_phone_2: order.customer_phone_2,
+          customer_email: order.customer_email,
+          governorate: order.governorate,
+          city: order.city,
+          street_address: order.street_address,
+          landmark: order.landmark,
+          order_notes: order.order_notes,
           created_at: order.created_at,
+          items: items,
           items_count: items.length,
         },
       });
@@ -228,16 +246,39 @@ class OrderController {
       }
 
       const trimmed = query.trim();
-      const isOrderNum = trimmed.toUpperCase().startsWith('TRD-');
+      const isOrderNum = trimmed.toUpperCase().startsWith('TRD-') || isNaN(trimmed) === false;
 
-      const whereClause = isOrderNum
-        ? { order_number: trimmed.toUpperCase() }
-        : { customer_phone: trimmed };
+      const whereClause = trimmed.toUpperCase().startsWith('TRD-')
+        ? { order_number: { [Op.iLike]: trimmed } }
+        : {
+            [Op.or]: [
+              { order_number: { [Op.iLike]: trimmed } },
+              { customer_phone: { [Op.iLike]: `%${trimmed}%` } },
+              { customer_phone_2: { [Op.iLike]: `%${trimmed}%` } },
+            ],
+          };
 
       const orders = await Order.findAll({
         where: whereClause,
         include: [
-          { model: OrderItem, as: 'items' },
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['id', 'name_ar', 'name_en', 'slug', 'sku', 'stock_quantity'],
+                include: [
+                  {
+                    model: ProductImage,
+                    as: 'images',
+                    attributes: ['image_url', 'is_primary'],
+                  },
+                ],
+              },
+            ],
+          },
           { model: OrderTrackingLog, as: 'tracking_logs', order: [['created_at', 'ASC']] },
         ],
         order: [['created_at', 'DESC']],
@@ -253,7 +294,7 @@ class OrderController {
       return res.status(200).json({
         success: true,
         count: orders.length,
-        data: orders.map((o) => res.localize(o)),
+        data: typeof res.localize === 'function' ? orders.map((o) => res.localize(o)) : orders,
       });
     } catch (error) {
       next(error);
@@ -261,7 +302,193 @@ class OrderController {
   }
 
   /**
-   * Admin: List & Search Orders
+   * Get Single Order by Order Number or ID
+   * GET /api/v1/orders/by-number/:orderNumber
+   */
+  static async getOrderByNumber(req, res, next) {
+    try {
+      const { orderNumber } = req.params;
+      if (!orderNumber) {
+        return res.status(400).json({ success: false, message: 'Order number is required' });
+      }
+
+      const trimmed = orderNumber.trim();
+      const whereClause = isNaN(trimmed)
+        ? { order_number: { [Op.iLike]: trimmed } }
+        : {
+            [Op.or]: [
+              { id: trimmed },
+              { order_number: { [Op.iLike]: trimmed } },
+            ],
+          };
+
+      const order = await Order.findOne({
+        where: whereClause,
+        include: [
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['id', 'name_ar', 'name_en', 'slug', 'sku', 'stock_quantity'],
+                include: [
+                  {
+                    model: ProductImage,
+                    as: 'images',
+                    attributes: ['image_url', 'is_primary'],
+                  },
+                ],
+              },
+            ],
+          },
+          { model: OrderTrackingLog, as: 'tracking_logs', order: [['created_at', 'ASC']] },
+        ],
+      });
+
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Customer Self-Service Update (Allowed only if NOT shipped yet)
+   * PATCH /api/v1/orders/:orderNumber/customer-update
+   */
+  static async customerUpdateOrder(req, res, next) {
+    try {
+      const { orderNumber } = req.params;
+      const {
+        customer_name,
+        customer_phone,
+        customer_phone_2,
+        governorate,
+        city,
+        street_address,
+        landmark,
+        order_notes,
+        items,
+      } = req.body;
+
+      const order = await Order.findOne({
+        where: { order_number: orderNumber },
+        include: [{ model: OrderItem, as: 'items' }],
+      });
+
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+      }
+
+      // Customer can ONLY edit if status is new, confirmed, or processing
+      if (!['new', 'confirmed', 'processing'].includes(order.order_status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'عفواً، لا يمكن تعديل بيانات الطلب لأنه قيد الشحن أو تم تسليمه بالفعل.',
+        });
+      }
+
+      if (customer_name && customer_name.trim()) order.customer_name = customer_name.trim();
+      if (customer_phone && customer_phone.trim()) order.customer_phone = customer_phone.trim();
+      if (customer_phone_2 !== undefined) order.customer_phone_2 = customer_phone_2 ? customer_phone_2.trim() : null;
+      if (governorate && governorate.trim()) order.governorate = governorate.trim();
+      if (city && city.trim()) order.city = city.trim();
+      if (street_address && street_address.trim()) order.street_address = street_address.trim();
+      if (landmark !== undefined) order.landmark = landmark ? landmark.trim() : null;
+      if (order_notes !== undefined) order.order_notes = order_notes;
+
+      // Handle item quantity modification or deletion
+      if (Array.isArray(items) && items.length > 0) {
+        let newSubtotal = 0;
+        for (const itemMod of items) {
+          const oi = order.items.find((i) => i.id == itemMod.id);
+          if (oi) {
+            const newQty = Number(itemMod.quantity);
+            if (newQty <= 0) {
+              await oi.destroy();
+            } else {
+              oi.quantity = newQty;
+              oi.total_price = Number(oi.unit_price) * newQty;
+              await oi.save();
+              newSubtotal += Number(oi.total_price);
+            }
+          }
+        }
+        if (newSubtotal > 0) {
+          order.subtotal = newSubtotal;
+          order.total_amount = Math.max(0, newSubtotal - Number(order.discount_amount) + Number(order.shipping_fee));
+        }
+      }
+
+      await order.save();
+
+      await OrderTrackingLog.create({
+        order_id: order.id,
+        from_status: order.order_status,
+        to_status: order.order_status,
+        title_ar: 'تعديل بيانات الطلب',
+        title_en: 'Order Details Updated',
+        notes_ar: 'قام العميل بتحديث بيانات الشحن والتوصيل للطلب.',
+        notes_en: 'Customer updated delivery information for this order.',
+        internal_erp_note: 'Updated by customer via tracking self-service.',
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'تم تحديث بيانات الطلب بنجاح',
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Customer Self-Service Cancel (Allowed only if NOT shipped yet)
+   * POST /api/v1/orders/:orderNumber/customer-cancel
+   */
+  static async customerCancelOrder(req, res, next) {
+    try {
+      const { orderNumber } = req.params;
+      const { cancellation_reason } = req.body;
+
+      const order = await Order.findOne({ where: { order_number: orderNumber } });
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+      }
+
+      if (!['new', 'confirmed', 'processing'].includes(order.order_status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'عفواً، لا يمكن إلغاء الطلب لأنه قيد الشحن أو تم تسليمه بالفعل.',
+        });
+      }
+
+      const updated = await OrderLifecycleService.transitionStatus(order.id, 'cancelled', null, {
+        cancellation_reason: cancellation_reason || 'تم الإلغاء بناءً على رغبة العميل من صفحة التتبع',
+        internal_note: 'Customer cancelled order via tracking self-service',
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'تم إلغاء الطلب بنجاح',
+        data: updated,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Admin: List & Search Orders with Time Filters and Status Counts
    * GET /api/v1/orders
    */
   static async listOrders(req, res, next) {
@@ -270,20 +497,65 @@ class OrderController {
         status,
         payment_status,
         search,
+        time_filter,
+        date_from,
+        date_to,
         page = 1,
-        limit = 20,
+        limit = 30,
       } = req.query;
 
       const whereClause = {};
-      if (status) whereClause.order_status = status;
-      if (payment_status) whereClause.payment_status = payment_status;
 
-      if (search) {
+      // Status Filter
+      if (status && status !== 'all') {
+        if (status === 'new') whereClause.order_status = 'new';
+        else if (status === 'pending') whereClause.order_status = { [Op.in]: ['confirmed', 'processing'] };
+        else if (status === 'processing') whereClause.order_status = 'processing';
+        else if (status === 'shipped') whereClause.order_status = 'shipped';
+        else if (status === 'delivered') whereClause.order_status = 'delivered';
+        else if (status === 'returned') whereClause.order_status = { [Op.in]: ['returned_to_warehouse', 'return_received', 'refunded'] };
+        else if (status === 'cancelled') whereClause.order_status = 'cancelled';
+        else whereClause.order_status = status;
+      }
+
+      if (payment_status && payment_status !== 'all') {
+        whereClause.payment_status = payment_status;
+      }
+
+      // Time Filter (فيلتر زمني)
+      const now = new Date();
+      if (time_filter === 'today') {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        whereClause.created_at = { [Op.gte]: startOfDay };
+      } else if (time_filter === '7days') {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        whereClause.created_at = { [Op.gte]: sevenDaysAgo };
+      } else if (time_filter === '30days') {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        whereClause.created_at = { [Op.gte]: thirtyDaysAgo };
+      } else if (time_filter === 'month') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+        whereClause.created_at = { [Op.gte]: startOfMonth };
+      } else if (date_from || date_to) {
+        whereClause.created_at = {};
+        if (date_from) whereClause.created_at[Op.gte] = new Date(date_from);
+        if (date_to) {
+          const end = new Date(date_to);
+          end.setHours(23, 59, 59, 999);
+          whereClause.created_at[Op.lte] = end;
+        }
+      }
+
+      // Search Query
+      if (search && search.trim()) {
         const q = `%${search.trim()}%`;
         whereClause[Op.or] = [
           { order_number: { [Op.iLike]: q } },
           { customer_name: { [Op.iLike]: q } },
           { customer_phone: { [Op.iLike]: q } },
+          { customer_email: { [Op.iLike]: q } },
+          { city: { [Op.iLike]: q } },
+          { governorate: { [Op.iLike]: q } },
         ];
       }
 
@@ -291,8 +563,18 @@ class OrderController {
       const { count, rows } = await Order.findAndCountAll({
         where: whereClause,
         include: [
-          { model: OrderItem, as: 'items' },
-          { model: OrderTrackingLog, as: 'tracking_logs' },
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['id', 'name_ar', 'name_en', 'slug', 'sku'],
+              },
+            ],
+          },
+          { model: OrderTrackingLog, as: 'tracking_logs', order: [['created_at', 'DESC']] },
         ],
         order: [['created_at', 'DESC']],
         limit: Number(limit),
@@ -300,10 +582,38 @@ class OrderController {
         distinct: true,
       });
 
+      // Compute Status Counter Badges across all orders
+      const allOrders = await Order.findAll({
+        attributes: ['order_status', 'created_at'],
+      });
+
+      const statusCounts = {
+        all: allOrders.length,
+        new: 0,
+        pending: 0,
+        processing: 0,
+        shipped: 0,
+        delivered: 0,
+        returned: 0,
+        cancelled: 0,
+      };
+
+      allOrders.forEach((o) => {
+        const st = o.order_status;
+        if (st === 'new') statusCounts.new++;
+        else if (st === 'confirmed') statusCounts.pending++;
+        else if (st === 'processing') statusCounts.processing++;
+        else if (st === 'shipped') statusCounts.shipped++;
+        else if (st === 'delivered') statusCounts.delivered++;
+        else if (st === 'returned_to_warehouse' || st === 'return_received' || st === 'refunded') statusCounts.returned++;
+        else if (st === 'cancelled') statusCounts.cancelled++;
+      });
+
       return res.status(200).json({
         success: true,
         count,
         total_pages: Math.ceil(count / limit),
+        status_counts: statusCounts,
         data: rows,
       });
     } catch (error) {
@@ -320,7 +630,7 @@ class OrderController {
       const { id } = req.params;
       const { status, courier_name, tracking_waybill, cancellation_reason, internal_note } = req.body;
 
-      const updated = await OrderLifecycleService.transitionStatus(id, status, req.user, {
+      const updated = await OrderLifecycleService.transitionStatus(id, status, req.user || null, {
         courier_name,
         tracking_waybill,
         cancellation_reason,
@@ -329,8 +639,48 @@ class OrderController {
 
       return res.status(200).json({
         success: true,
-        message: `Order status successfully transitioned to ${status}`,
+        message: `تم تحديث حالة الطلب إلى ${status} بنجاح`,
         data: updated,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Admin: Add Internal Comment / Note
+   * POST /api/v1/orders/:id/comment
+   */
+  static async addComment(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { comment } = req.body;
+
+      if (!comment || !comment.trim()) {
+        return res.status(400).json({ success: false, message: 'نص التعليق مطلوب' });
+      }
+
+      const order = await Order.findByPk(id);
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+      }
+
+      const log = await OrderTrackingLog.create({
+        order_id: order.id,
+        from_status: order.order_status,
+        to_status: order.order_status,
+        title_ar: 'ملاحظة إدارية داخلية',
+        title_en: 'Internal Admin Note',
+        notes_ar: comment.trim(),
+        notes_en: comment.trim(),
+        internal_erp_note: comment.trim(),
+        updated_by: req.user ? req.user.id : null,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'تم إضافة التعليق بنجاح',
+        data: log,
       });
     } catch (error) {
       next(error);

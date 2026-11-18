@@ -9,6 +9,7 @@ router.get('/products', CatalogController.getProducts);
 router.get('/products/analytics', CatalogController.getProductAnalytics);
 router.get('/products/generate-codes', CatalogController.generateProductCodes);
 router.get('/products/check-unique', CatalogController.checkProductUnique);
+router.get('/products/export-all', CatalogController.getProductsForExport);
 router.get('/home-categories', CatalogController.getHomeCategories);
 router.get('/products/:identifier', CatalogController.getProductByIdentifier);
 router.get('/categories', CatalogController.getAllCategories);
@@ -21,6 +22,13 @@ router.get('/bundles/:id', CatalogController.getBundleById);
 router.post('/reviews', CatalogController.submitReview);
 
 // Admin & ERP Product Endpoints
+router.post(
+  '/products/bulk-import-zip',
+  authMiddleware,
+  permitRoles('super_admin', 'erp_manager'),
+  CatalogController.bulkImportFromZip
+);
+
 router.post(
   '/products',
   authMiddleware,

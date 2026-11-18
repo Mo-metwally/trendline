@@ -14,13 +14,13 @@
   background-size: cover;
   font-family: var(--font-cairo), 'Cairo', 'Tajawal', sans-serif;
   color: #0f172a;
-  padding-bottom: 72px;
+  padding-bottom: 0;
 
   .cats-container {
     width: 96%;
     max-width: 1820px;
     margin: 0 auto;
-    padding: 14px 12px 0;
+    padding: 14px 12px 64px;
 
     @media (max-width: 768px) {
       width: 100%;

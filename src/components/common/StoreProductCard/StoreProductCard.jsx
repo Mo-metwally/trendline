@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { FaShareNodes, FaArrowLeft, FaChevronRight, FaStar } from 'react-icons/fa6';
+import { FaShareNodes, FaArrowLeft, FaChevronRight, FaStar, FaCartPlus, FaCheck, FaCartShopping } from 'react-icons/fa6';
+import { useCart } from '@/src/context/CartContext';
 import './StoreProductCard.scss';
 
 export default function StoreProductCard({
@@ -100,6 +101,18 @@ export default function StoreProductCard({
     }
   };
 
+  const { addToCart } = useCart();
+  const [isAdding, setIsAdding] = useState(false);
+
+  const handleAddToCart = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isPreview || !product.id || !inStock || isAdding) return;
+    setIsAdding(true);
+    await addToCart(product.id, 1, 'product', { lang, openDrawer: true });
+    setIsAdding(false);
+  };
+
   const handleMouseEnter = () => {
     setIsHovered(true);
     if (imagesList.length > 1) {
@@ -164,6 +177,19 @@ export default function StoreProductCard({
         >
           <FaShareNodes size={13} />
         </button>
+
+        {/* Floating Quick Add to Cart Button */}
+        {inStock && (
+          <button
+            type="button"
+            className={`sp-quick-cart ${isAdding ? 'is-adding' : ''}`}
+            title={isRtl ? 'إضافة سريعة إلى السلة' : 'Quick add to cart'}
+            onClick={handleAddToCart}
+            disabled={isAdding}
+          >
+            {isAdding ? <FaCheck size={12} /> : <FaCartPlus size={12} />}
+          </button>
+        )}
 
         {/* Image Display with Smooth Crossfade on Hover */}
         <Link
@@ -250,11 +276,6 @@ export default function StoreProductCard({
                 <span className="old-p">
                   {origPrice.toLocaleString()} {currencyLabel}
                 </span>
-                <span className="save-tag">
-                  {isRtl
-                    ? `وفّر ${(origPrice - salePrice).toLocaleString()} ${currencyLabel}`
-                    : `Save ${(origPrice - salePrice).toLocaleString()} ${currencyLabel}`}
-                </span>
               </div>
             )}
             <div className="curr-p">
@@ -262,14 +283,29 @@ export default function StoreProductCard({
             </div>
           </div>
 
-          <Link
-            href={prodUrl}
-            className="sp-view-btn"
-            onClick={isPreview ? (e) => e.preventDefault() : undefined}
-          >
-            <span>{isRtl ? 'عرض المنتج' : 'View Product'}</span>
-            {isRtl ? <FaArrowLeft size={11} /> : <FaChevronRight size={11} />}
-          </Link>
+          <div className="sp-actions-box">
+            {inStock && (
+              <button
+                type="button"
+                className={`sp-add-cart-btn ${isAdding ? 'is-adding' : ''}`}
+                onClick={handleAddToCart}
+                disabled={isAdding}
+                title={isRtl ? 'إضافة إلى السلة' : 'Add to Cart'}
+              >
+                {isAdding ? <FaCheck size={12} /> : <FaCartShopping size={12} />}
+                {/* <span>{isRtl ? 'أضف' : 'Add'}</span> */}
+              </button>
+            )}
+
+            <Link
+              href={prodUrl}
+              className="sp-view-btn"
+              onClick={isPreview ? (e) => e.preventDefault() : undefined}
+            >
+              <span>{isRtl ? 'عرض' : 'View'}</span>
+              {isRtl ? <FaArrowLeft size={11} /> : <FaChevronRight size={11} />}
+            </Link>
+          </div>
         </div>
       </div>
     </article>

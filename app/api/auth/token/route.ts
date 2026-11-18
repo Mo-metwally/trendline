@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, connection } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../[...nextauth]/route';
 import jwt from 'jsonwebtoken';
 
 export async function GET(request: Request) {
   try {
+    await connection();
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {

@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { Op } = require('sequelize');
 const {
   Product,
@@ -1040,6 +1042,280 @@ class CatalogController {
       return res.status(200).json({ success: true, message: `Bulk action '${action}' applied successfully` });
     } catch (error) {
       next(error);
+    }
+  }
+
+  /**
+   * Bulk Import Products & Images from Zip extraction
+   * POST /api/v1/catalog/products/bulk-import-zip
+   */
+  static async bulkImportFromZip(req, res, next) {
+    try {
+      const { products = [] } = req.body;
+      if (!Array.isArray(products) || products.length === 0) {
+        return res.status(400).json({ success: false, message: 'لم يتم توفير أي منتجات للاستيراد' });
+      }
+
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const imported = [];
+      const errors = [];
+
+      for (let idx = 0; idx < products.length; idx++) {
+        const item = products[idx];
+        const t = await sequelize.transaction();
+        try {
+          // 1. Basic validation
+          const nameAr = (item.name_ar || '').trim();
+          if (!nameAr) {
+            await t.rollback();
+            errors.push({ index: idx, name: item.name_en || `صف ${idx + 1}`, error: 'اسم المنتج بالعربية مطلوب' });
+            continue;
+          }
+
+          const originalPrice = parseFloat(item.original_price);
+          if (isNaN(originalPrice) || originalPrice <= 0) {
+            await t.rollback();
+            errors.push({ index: idx, name: nameAr, error: 'السعر غير صالح' });
+            continue;
+          }
+
+          // 2. English name fallback
+          const nameEn = (item.name_en || '').trim() || nameAr;
+
+          // 3. Category handling: find by id or findOrCreate by name
+          let categoryId = item.category_id;
+          if (!categoryId && item.category_name) {
+            const catName = item.category_name.trim();
+            let cat = await Category.findOne({
+              where: {
+                [Op.or]: [
+                  { name_ar: catName },
+                  { name_en: { [Op.iLike]: catName } },
+                  { slug: { [Op.iLike]: catName.toLowerCase().replace(/[^a-z0-9]/g, '-') } },
+                ],
+              },
+              transaction: t,
+            });
+            if (!cat) {
+              const catSlug = catName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 6);
+              cat = await Category.create({
+                id: 'cat_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 4),
+                name_ar: catName,
+                name_en: catName,
+                slug: catSlug,
+                is_active: true,
+              }, { transaction: t });
+            }
+            categoryId = cat.id;
+          }
+
+          // 4. Brand handling: find by id or name if provided
+          let brandId = item.brand_id || null;
+          if (!brandId && item.brand_name) {
+            const bName = item.brand_name.trim();
+            let brand = await Brand.findOne({
+              where: {
+                [Op.or]: [
+                  { name_ar: bName },
+                  { name_en: { [Op.iLike]: bName } },
+                ],
+              },
+              transaction: t,
+            });
+            if (!brand) {
+              const bSlug = bName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 6);
+              brand = await Brand.create({
+                name_ar: bName,
+                name_en: bName,
+                slug: bSlug,
+                is_active: true,
+              }, { transaction: t });
+            }
+            brandId = brand.id;
+          }
+
+          // 5. Slug uniqueness
+          let slug = (item.slug || '').trim();
+          if (!slug) {
+            slug = nameEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            if (!slug) slug = 'prod-' + Date.now().toString(36);
+          }
+          const existingSlug = await Product.findOne({ where: { slug }, transaction: t });
+          if (existingSlug) {
+            slug = `${slug}-${Date.now().toString(36).slice(-4)}-${Math.random().toString(36).substring(2, 5)}`;
+          }
+
+          // 6. SKU uniqueness
+          let sku = (item.sku || '').trim();
+          if (sku) {
+            const existingSku = await Product.findOne({ where: { sku }, transaction: t });
+            if (existingSku) {
+              sku = await generateProductSku({ Product }, 'ZIP', t);
+            }
+          } else {
+            sku = await generateProductSku({ Product }, 'ZIP', t);
+          }
+
+          // 7. Barcode
+          let barcode = (item.barcode || '').trim();
+          if (barcode) {
+            const existingBarcode = await Product.findOne({ where: { barcode }, transaction: t });
+            if (existingBarcode) {
+              barcode = await generateProductBarcodeEAN13({ Product }, t);
+            }
+          } else {
+            barcode = await generateProductBarcodeEAN13({ Product }, t);
+          }
+
+          // 8. Generate Product ID
+          const productId = await generateProductId({ Product }, t);
+
+          const salePrice = item.sale_price ? parseFloat(item.sale_price) : null;
+          let discountPercent = 0;
+          if (salePrice && originalPrice > salePrice) {
+            discountPercent = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
+          }
+
+          // 9. Create Product
+          const product = await Product.create({
+            id: productId,
+            brand_id: brandId,
+            name_ar: nameAr,
+            name_en: nameEn,
+            slug,
+            sku,
+            barcode,
+            cost_price: item.cost_price ? parseFloat(item.cost_price) : 0,
+            original_price: originalPrice,
+            sale_price: salePrice,
+            discount_percent: discountPercent,
+            stock_quantity: item.stock_quantity ? parseInt(item.stock_quantity, 10) : 0,
+            low_stock_threshold: item.low_stock_threshold ? parseInt(item.low_stock_threshold, 10) : 5,
+            short_desc_ar: item.short_desc_ar || null,
+            short_desc_en: item.short_desc_en || null,
+            description_ar: item.description_ar || null,
+            description_en: item.description_en || null,
+            is_active: item.is_active !== undefined ? !!item.is_active : true,
+            is_featured: !!item.is_featured,
+          }, { transaction: t });
+
+          // 10. Link Category
+          if (categoryId) {
+            await ProductCategory.create({
+              product_id: product.id,
+              category_id: categoryId,
+              is_primary: true,
+              is_auto_assigned: false,
+            }, { transaction: t });
+          }
+
+          // 11. Handle Images
+          const images = Array.isArray(item.images) ? item.images : [];
+          for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
+            const imgItem = images[imgIdx];
+            let imageUrl = '';
+
+            // If base64 provided
+            if (imgItem.dataBase64) {
+              const cleanBase64 = imgItem.dataBase64.replace(/^data:image\/\w+;base64,/, '');
+              const buffer = Buffer.from(cleanBase64, 'base64');
+              const ext = imgItem.extension || path.extname(imgItem.filename || '') || '.webp';
+              const cleanName = path.basename(imgItem.filename || 'img', ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 25);
+              const filename = `zip_${Date.now()}_${cleanName}_${imgIdx}${ext}`;
+              const filePath = path.join(uploadsDir, filename);
+              fs.writeFileSync(filePath, buffer);
+              imageUrl = `/uploads/products/${filename}`;
+            } else if (imgItem.image_url) {
+              imageUrl = imgItem.image_url;
+            }
+
+            if (imageUrl) {
+              await ProductImage.create({
+                product_id: product.id,
+                image_url: imageUrl,
+                alt_text_ar: nameAr,
+                alt_text_en: nameEn,
+                is_primary: imgIdx === 0,
+                sort_order: imgIdx,
+              }, { transaction: t });
+            }
+          }
+
+          await t.commit();
+          imported.push({ id: product.id, sku: product.sku, name_ar: product.name_ar });
+        } catch (itemErr) {
+          await t.rollback();
+          console.error(`Error importing product at index ${idx}:`, itemErr);
+          errors.push({ index: idx, name: item.name_ar || `صف ${idx + 1}`, error: itemErr.message });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `تم استيراد ${imported.length} منتج بنجاح${errors.length > 0 ? ` مع ${errors.length} خطأ` : ''}`,
+        count: imported.length,
+        imported,
+        errors,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Fetch products for bulk export (All, Selected, or Category)
+   * GET /api/v1/catalog/products/export-all
+   */
+  static async getProductsForExport(req, res, next) {
+    try {
+      const { scope = 'all', ids, category_id } = req.query;
+      const whereClause = {};
+
+      if (scope === 'selected' && ids) {
+        const idList = ids.split(',').map((id) => id.trim()).filter(Boolean);
+        whereClause.id = { [Op.in]: idList };
+      }
+
+      const include = [
+        {
+          model: Category,
+          as: 'categories',
+          through: { attributes: ['is_primary'] },
+          attributes: ['id', 'name_ar', 'name_en', 'slug'],
+        },
+        {
+          model: Brand,
+          as: 'brand',
+          attributes: ['id', 'name_ar', 'name_en'],
+        },
+        {
+          model: ProductImage,
+          as: 'images',
+          attributes: ['id', 'image_url', 'is_primary', 'sort_order'],
+        },
+      ];
+
+      if (scope === 'category' && category_id && category_id !== 'all') {
+        include[0].where = { id: category_id };
+      }
+
+      const products = await Product.findAll({
+        where: whereClause,
+        include,
+        order: [['created_at', 'DESC']],
+      });
+
+      return res.status(200).json({
+        success: true,
+        count: products.length,
+        data: products,
+      });
+    } catch (err) {
+      next(err);
     }
   }
 

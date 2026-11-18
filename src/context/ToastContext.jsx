@@ -73,7 +73,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ addToast, removeToast, success, error, warning, info }}>
       {children}
-      <div className="trendline-toast-viewport" aria-live="polite">
+      <div className="trendline-toast-viewport" aria-live="polite" suppressHydrationWarning>
         {toasts.map((toast) => (
           <div
             key={toast.id}

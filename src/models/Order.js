@@ -43,6 +43,10 @@ const Order = sequelize.define('Order', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+  landmark: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
   order_notes: {
     type: DataTypes.TEXT,
     allowNull: true,

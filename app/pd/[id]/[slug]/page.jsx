@@ -8,6 +8,7 @@ import Footer from '@/src/components/common/Footer/Footer';
 import AmazonMediaGallery from '@/src/components/common/AmazonMediaGallery/AmazonMediaGallery';
 import StoreProductCard from '@/src/components/common/StoreProductCard/StoreProductCard';
 import { useToast, renderPillarIcon, DEFAULT_SHOWCASE_TABS } from '@/src/components/adminComponents';
+import { useCart } from '@/src/context/CartContext';
 import useTrendlineLang from '@/src/hooks/useTrendlineLang';
 import {
   FaHouse,
@@ -80,6 +81,7 @@ function ProductDetailsContent() {
   const params = useParams();
   const router = useRouter();
   const toast = useToast();
+  const { addToCart, openCart } = useCart();
 
   const rawId = params?.id ? decodeURIComponent(String(params.id)) : '';
   const rawSlug = params?.slug ? decodeURIComponent(String(params.slug)) : '';
@@ -683,23 +685,29 @@ function ProductDetailsContent() {
     setSelectedBundleProdIds(activeBundle.items.map((it) => String(it.product_id)));
   };
 
-  const handleAddBundleToCart = () => {
+  const handleAddBundleToCart = async () => {
     if (bundleCalc.selectedItems.length === 0) {
-      toast?.error?.('يرجى تحديد منتج واحد على الأقل من الباندل لإضافته للعربة');
+      toast?.error?.(isRtl ? 'يرجى تحديد منتج واحد على الأقل من الباندل لإضافته للعربة' : 'Please select at least one item');
       return;
     }
 
     setBundleAddedSuccess(true);
-    if (bundleCalc.isFullBundleSelected) {
-      toast?.success?.(
-        `تمت إضافة الباندل الكاملة "${activeBundle.name_ar}" (${bundleCalc.selectedItems.length} منتجات) بالسعر المخفض (${bundleCalc.finalPrice.toLocaleString()} ج.م) إلى العربة!`
-      );
+    if (bundleCalc.isFullBundleSelected && activeBundle?.id) {
+      await addToCart(activeBundle.id, 1, 'bundle', { lang, openDrawer: true });
     } else {
-      toast?.info?.(
-        `تمت إضافة (${bundleCalc.selectedItems.length}) منتجات مختارة من الباندل بإجمالي (${bundleCalc.finalPrice.toLocaleString()} ج.م — بدون خصم الباندل الكاملة) إلى العربة!`
+      for (const item of bundleCalc.selectedItems) {
+        if (item.product_id) {
+          await addToCart(item.product_id, 1, 'product', { lang, silent: true, openDrawer: false });
+        }
+      }
+      toast?.success?.(
+        isRtl
+          ? `تمت إضافة (${bundleCalc.selectedItems.length}) منتجات من الباقة إلى السلة!`
+          : `Added (${bundleCalc.selectedItems.length}) bundle items to cart!`
       );
+      openCart();
     }
-    setTimeout(() => setBundleAddedSuccess(false), 3500);
+    setTimeout(() => setBundleAddedSuccess(false), 2500);
   };
 
   // Short Share URL Function: converts `/pd/:id/:slug` -> `/pd/:id`
@@ -738,17 +746,11 @@ function ProductDetailsContent() {
     }
   };
 
-  const handleOrderNow = () => {
+  const handleOrderNow = async () => {
+    if (!product?.id) return;
     setOrderSubmitted(true);
-    const activeName = isRtl
-      ? product?.name_ar || product?.name_en || product?.name
-      : product?.name_en || product?.name_ar || product?.name;
-    toast?.success?.(
-      isRtl
-        ? `تمت إضافة (${quantity}) من "${activeName}" إلى طلبك السريع بنجاح!`
-        : `Added (${quantity}) of "${activeName}" to your quick order successfully!`
-    );
-    setTimeout(() => setOrderSubmitted(false), 3000);
+    await addToCart(product.id, quantity, 'product', { lang, openDrawer: true });
+    setTimeout(() => setOrderSubmitted(false), 2500);
   };
 
   if (loading) {

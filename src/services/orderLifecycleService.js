@@ -238,8 +238,8 @@ class OrderLifecycleService {
 
       // A. SHIPPED: Physical deduction from warehouse
       if (newStatus === 'shipped') {
-        if (!['confirmed', 'processing'].includes(currentStatus)) {
-          throw new Error(`Order must be 'confirmed' or 'processing' before dispatching as 'shipped'. Current: ${currentStatus}`);
+        if (!['new', 'confirmed', 'processing'].includes(currentStatus)) {
+          throw new Error(`Order must be 'new', 'confirmed' or 'processing' before dispatching as 'shipped'. Current: ${currentStatus}`);
         }
 
         for (const item of order.items) {

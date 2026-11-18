@@ -18,7 +18,10 @@
   box-sizing: border-box;
 }
 
-html,
+html {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -29,4 +32,6 @@ body {
   background-color: #f7f9fd;
   color: var(--main-text-color);
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
